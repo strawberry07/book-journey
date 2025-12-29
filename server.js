@@ -385,6 +385,26 @@ const requestListener = async (req, res) => {
     return;
   }
 
+  // Clear cache endpoint (for admin use)
+  if (req.method === "POST" && urlObj.pathname === "/api/admin/clear-cache") {
+    try {
+      const cache = await readCache();
+      const cacheSize = Object.keys(cache).length;
+      
+      // Clear the cache
+      await writeCache({});
+      
+      console.log(`🗑️  Cache cleared: ${cacheSize} entries removed`);
+      return sendJson(res, 200, { 
+        success: true, 
+        message: `Cache cleared successfully. Removed ${cacheSize} cached summaries.` 
+      });
+    } catch (err) {
+      console.error("Error clearing cache:", err);
+      return sendJson(res, 500, { error: "Failed to clear cache" });
+    }
+  }
+
   if (req.method === "GET" && urlObj.pathname === "/api/book/today") {
     try {
       const book = await getTodaysBook();
