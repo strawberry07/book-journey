@@ -286,7 +286,13 @@ const ensureSummary = async (bookId) => {
 };
 
 const sendJson = (res, status, data) => {
-  res.writeHead(status, { "Content-Type": "application/json; charset=utf-8" });
+  const headers = {
+    "Content-Type": "application/json; charset=utf-8",
+    "Access-Control-Allow-Origin": "*",
+    "Access-Control-Allow-Methods": "GET, POST, OPTIONS",
+    "Access-Control-Allow-Headers": "Content-Type",
+  };
+  res.writeHead(status, headers);
   res.end(JSON.stringify(data));
 };
 
@@ -320,9 +326,23 @@ const requestListener = async (req, res) => {
   const urlObj = new URL(req.url, `http://${req.headers.host || 'localhost'}`);
   console.log(`📨 ${req.method} ${urlObj.pathname}`);
 
+  // Handle CORS preflight requests
+  if (req.method === "OPTIONS") {
+    res.writeHead(200, {
+      "Access-Control-Allow-Origin": "*",
+      "Access-Control-Allow-Methods": "GET, POST, OPTIONS",
+      "Access-Control-Allow-Headers": "Content-Type",
+    });
+    res.end();
+    return;
+  }
+
   // Health check endpoint for Railway/deployment platforms
   if (req.method === "GET" && urlObj.pathname === "/health") {
-    res.writeHead(200, { "Content-Type": "application/json" });
+    res.writeHead(200, { 
+      "Content-Type": "application/json",
+      "Access-Control-Allow-Origin": "*",
+    });
     res.end(JSON.stringify({ status: "ok", service: "book-journey", timestamp: Date.now() }));
     return;
   }
