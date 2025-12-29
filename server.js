@@ -322,7 +322,9 @@ const requestListener = async (req, res) => {
 
   // Health check endpoint for Railway/deployment platforms
   if (req.method === "GET" && urlObj.pathname === "/health") {
-    return sendJson(res, 200, { status: "ok", service: "book-journey" });
+    res.writeHead(200, { "Content-Type": "application/json" });
+    res.end(JSON.stringify({ status: "ok", service: "book-journey", timestamp: Date.now() }));
+    return;
   }
 
   if (req.method === "GET" && urlObj.pathname === "/api/book/today") {
@@ -392,5 +394,33 @@ server.listen(PORT, '0.0.0.0', () => {
   } else {
     console.log("✓ DeepSeek API key is set");
   }
+});
+
+// Handle graceful shutdown
+process.on('SIGTERM', () => {
+  console.log('SIGTERM signal received: closing HTTP server');
+  server.close(() => {
+    console.log('HTTP server closed');
+    process.exit(0);
+  });
+});
+
+process.on('SIGINT', () => {
+  console.log('SIGINT signal received: closing HTTP server');
+  server.close(() => {
+    console.log('HTTP server closed');
+    process.exit(0);
+  });
+});
+
+// Handle uncaught errors to prevent crashes
+process.on('uncaughtException', (err) => {
+  console.error('Uncaught Exception:', err);
+  // Don't exit, let the server keep running
+});
+
+process.on('unhandledRejection', (reason, promise) => {
+  console.error('Unhandled Rejection at:', promise, 'reason:', reason);
+  // Don't exit, let the server keep running
 });
 
