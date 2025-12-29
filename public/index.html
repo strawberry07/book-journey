@@ -1,0 +1,99 @@
+<!doctype html>
+<html lang="zh">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <title>每日书旅</title>
+    <link rel="preconnect" href="https://fonts.googleapis.com">
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+    <link href="https://fonts.googleapis.com/css2?family=Noto+Serif+SC:wght@400;500;600;700&family=Inter:wght@300;400;500&display=swap" rel="stylesheet">
+    <link rel="stylesheet" href="/styles.css" />
+    <script src="https://cdn.jsdelivr.net/npm/html2canvas@1.4.1/dist/html2canvas.min.js"></script>
+  </head>
+  <body>
+    <header class="hero">
+      <div class="header-content">
+        <p class="eyebrow">每日书旅</p>
+        <button class="share-btn" id="share-btn" title="分享">
+          <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+            <circle cx="18" cy="5" r="3"></circle>
+            <circle cx="6" cy="12" r="3"></circle>
+            <circle cx="18" cy="19" r="3"></circle>
+            <line x1="8.59" y1="13.51" x2="15.42" y2="17.49"></line>
+            <line x1="15.41" y1="6.51" x2="8.59" y2="10.49"></line>
+          </svg>
+        </button>
+      </div>
+    </header>
+
+    <main class="container">
+      <section class="card">
+        <div class="card-header">
+          <div class="book-meta">
+            <p class="label date-label"><span id="date-display" class="date-text"></span></p>
+            <h2 id="title-cn">加载中...</h2>
+            <p id="title-en" class="title-en"></p>
+            <p id="author" class="muted"></p>
+          </div>
+          <div class="date-nav">
+            <button class="nav-btn" id="prev-day" title="前一天">‹</button>
+            <button class="nav-btn" id="next-day" title="后一天">›</button>
+          </div>
+        </div>
+        <div class="depth-grid">
+          <button class="depth-btn" data-depth="resonance">
+            <span>3 分钟 · 精华</span>
+          </button>
+          <button class="depth-btn" data-depth="deep_dive">
+            <span>10 分钟 · 思考</span>
+          </button>
+          <button class="depth-btn" data-depth="masterclass">
+            <span>30 分钟 · 沉浸</span>
+          </button>
+        </div>
+      </section>
+
+      <section class="card">
+        <div class="card-header">
+          <p class="label">今日摘要</p>
+          <div class="status" id="status">选择上方深度开始阅读</div>
+        </div>
+        <article id="summary" class="summary"></article>
+      </section>
+    </main>
+
+    <footer class="footer">
+      <p>读书便佳</p>
+    </footer>
+
+    <!-- Share overlay background -->
+    <div id="share-overlay" style="display: none; position: fixed; top: 0; left: 0; width: 100%; height: 100%; background: rgba(0, 0, 0, 0.5); z-index: 9999; backdrop-filter: blur(4px);"></div>
+    
+    <!-- Hidden share card for image generation -->
+    <div id="share-card" style="display: none; position: absolute; left: -9999px;">
+      <div class="share-card-content">
+        <button class="share-card-close" id="share-card-close" aria-label="关闭">×</button>
+        <div class="share-card-header">
+          <p class="share-card-date" id="share-card-date"></p>
+        </div>
+        <h1 class="share-card-title" id="share-card-title-cn"></h1>
+        <p class="share-card-title-en" id="share-card-title-en"></p>
+        <p class="share-card-author" id="share-card-author"></p>
+        <div class="share-card-quote-section">
+          <p class="share-card-quote" id="share-card-quote"></p>
+        </div>
+        <div class="share-card-footer">
+          <p>每日书旅 · 读书便佳</p>
+          <div class="share-card-status" id="share-card-status" style="display: none; padding: 12px; margin: 12px 0; background: rgba(47, 111, 235, 0.1); border-radius: 8px; text-align: center; font-size: 14px; color: var(--text);"></div>
+          <div class="share-card-actions">
+            <button class="share-card-download-btn" id="share-card-download">下载图片</button>
+            <button class="share-card-share-btn" id="share-card-share">分享</button>
+          </div>
+        </div>
+      </div>
+    </div>
+
+    <script src="/app.js" type="module"></script>
+  </body>
+</html>
+

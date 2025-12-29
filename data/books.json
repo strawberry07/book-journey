@@ -1,0 +1,603 @@
+[
+  {
+    "id": 1,
+    "title_cn": "穷查理宝典",
+    "title_en": "Poor Charlie's Almanack",
+    "author": "查理·芒格"
+  },
+  {
+    "id": 2,
+    "title_cn": "自私的基因",
+    "title_en": "The Selfish Gene",
+    "author": "理查德·道金斯"
+  },
+  {
+    "id": 3,
+    "title_cn": "思考，快与慢",
+    "title_en": "Thinking, Fast and Slow",
+    "author": "丹尼尔·卡尼曼"
+  },
+  {
+    "id": 4,
+    "title_cn": "黑天鹅",
+    "title_en": "The Black Swan",
+    "author": "纳西姆·塔勒布"
+  },
+  {
+    "id": 5,
+    "title_cn": "反脆弱",
+    "title_en": "Antifragile",
+    "author": "纳西姆·塔勒布"
+  },
+  {
+    "id": 6,
+    "title_cn": "影响力",
+    "title_en": "Influence",
+    "author": "罗伯特·西奥迪尼"
+  },
+  {
+    "id": 7,
+    "title_cn": "原则",
+    "title_en": "Principles",
+    "author": "瑞·达利欧"
+  },
+  {
+    "id": 8,
+    "title_cn": "系统之美",
+    "title_en": "Thinking in Systems",
+    "author": "德内拉·梅多斯"
+  },
+  {
+    "id": 9,
+    "title_cn": "误区",
+    "title_en": "Mistakes Were Made (But Not by Me)",
+    "author": "卡罗尔·塔夫里斯"
+  },
+  {
+    "id": 10,
+    "title_cn": "纳瓦尔宝典",
+    "title_en": "The Almanack of Naval Ravikant",
+    "author": "埃里克·乔根森"
+  },
+  {
+    "id": 11,
+    "title_cn": "逻辑哲学论",
+    "title_en": "Tractatus Logico-Philosophicus",
+    "author": "维特根斯坦"
+  },
+  {
+    "id": 12,
+    "title_cn": "哥德尔、艾舍尔、巴赫",
+    "title_en": "Gödel, Escher, Bach",
+    "author": "侯世达"
+  },
+  {
+    "id": 13,
+    "title_cn": "随机漫步的傻瓜",
+    "title_en": "Fooled by Randomness",
+    "author": "纳西姆·塔勒布"
+  },
+  {
+    "id": 14,
+    "title_cn": "关键迭代",
+    "title_en": "The Beginnings of Infinity",
+    "author": "大卫·多伊奇"
+  },
+  {
+    "id": 15,
+    "title_cn": "模型思维",
+    "title_en": "The Model Thinker",
+    "author": "斯科特·佩奇"
+  },
+  {
+    "id": 16,
+    "title_cn": "人类简史",
+    "title_en": "Sapiens",
+    "author": "尤瓦尔·赫拉利"
+  },
+  {
+    "id": 17,
+    "title_cn": "今日简史",
+    "title_en": "21 Lessons for the 21st Century",
+    "author": "尤瓦尔·赫拉利"
+  },
+  {
+    "id": 18,
+    "title_cn": "枪炮、病菌与钢铁",
+    "title_en": "Guns, Germs, and Steel",
+    "author": "贾雷德·戴蒙德"
+  },
+  {
+    "id": 19,
+    "title_cn": "昨日之前的世界",
+    "title_en": "The World Until Yesterday",
+    "author": "贾雷德·戴蒙德"
+  },
+  {
+    "id": 20,
+    "title_cn": "历史的教训",
+    "title_en": "The Lessons of History",
+    "author": "威尔·杜兰特"
+  },
+  {
+    "id": 21,
+    "title_cn": "大流向",
+    "title_en": "The Great Convergence",
+    "author": "理查德·鲍德温"
+  },
+  {
+    "id": 22,
+    "title_cn": "文明的冲突",
+    "title_en": "The Clash of Civilizations",
+    "author": "塞缪尔·亨廷顿"
+  },
+  {
+    "id": 23,
+    "title_cn": "大国崛起",
+    "title_en": "The Rise and Fall of the Great Powers",
+    "author": "保罗·肯尼迪"
+  },
+  {
+    "id": 24,
+    "title_cn": "万历十五年",
+    "title_en": "1587, A Year of No Significance",
+    "author": "黄仁宇"
+  },
+  {
+    "id": 25,
+    "title_cn": "罗马帝国衰亡史",
+    "title_en": "The Decline and Fall of the Roman Empire",
+    "author": "爱德华·吉本"
+  },
+  {
+    "id": 26,
+    "title_cn": "丝绸之路",
+    "title_en": "The Silk Roads",
+    "author": "彼得·弗兰科潘"
+  },
+  {
+    "id": 27,
+    "title_cn": "全球通史",
+    "title_en": "A Global History",
+    "author": "斯塔夫里阿诺斯"
+  },
+  {
+    "id": 28,
+    "title_cn": "崩溃：社会如何选择成败",
+    "title_en": "Collapse",
+    "author": "贾雷德·戴蒙德"
+  },
+  {
+    "id": 29,
+    "title_cn": "第二性",
+    "title_en": "The Second Sex",
+    "author": "西蒙娜·德·波伏娃"
+  },
+  {
+    "id": 30,
+    "title_cn": "想象的共同体",
+    "title_en": "Imagined Communities",
+    "author": "本尼迪克特·安德森"
+  },
+  {
+    "id": 31,
+    "title_cn": "国富论",
+    "title_en": "The Wealth of Nations",
+    "author": "亚当·斯密"
+  },
+  {
+    "id": 32,
+    "title_cn": "从 0 到 1",
+    "title_en": "Zero to One",
+    "author": "彼得·蒂尔"
+  },
+  {
+    "id": 33,
+    "title_cn": "聪明的投资者",
+    "title_en": "The Intelligent Investor",
+    "author": "本杰明·格雷厄姆"
+  },
+  {
+    "id": 34,
+    "title_cn": "小而美",
+    "title_en": "Small Is Beautiful",
+    "author": "舒马赫"
+  },
+  {
+    "id": 35,
+    "title_cn": "资本论",
+    "title_en": "Capital",
+    "author": "马克思"
+  },
+  {
+    "id": 36,
+    "title_cn": "怪诞行为学",
+    "title_en": "Predictably Irrational",
+    "author": "丹·艾瑞里"
+  },
+  {
+    "id": 37,
+    "title_cn": "基业长青",
+    "title_en": "Built to Last",
+    "author": "吉姆·柯林斯"
+  },
+  {
+    "id": 38,
+    "title_cn": "创新者的窘境",
+    "title_en": "The Innovator's Dilemma",
+    "author": "克莱顿·克里斯坦森"
+  },
+  {
+    "id": 39,
+    "title_cn": "叙事经济学",
+    "title_en": "Narrative Economics",
+    "author": "罗伯特·席勒"
+  },
+  {
+    "id": 40,
+    "title_cn": "博弈论",
+    "title_en": "Game Theory: A Very Short Introduction",
+    "author": "肯·宾默尔"
+  },
+  {
+    "id": 41,
+    "title_cn": "稀缺",
+    "title_en": "Scarcity",
+    "author": "塞德希尔·穆来纳森"
+  },
+  {
+    "id": 42,
+    "title_cn": "伟大的博弈",
+    "title_en": "The Empire of Fortune",
+    "author": "约翰·斯蒂尔·戈登"
+  },
+  {
+    "id": 43,
+    "title_cn": "硬球局",
+    "title_en": "Hardball",
+    "author": "克里斯·马修斯"
+  },
+  {
+    "id": 44,
+    "title_cn": "精益创业",
+    "title_en": "The Lean Startup",
+    "author": "埃里克·莱斯"
+  },
+  {
+    "id": 45,
+    "title_cn": "闪电式扩张",
+    "title_en": "Blitzscaling",
+    "author": "里德·霍夫曼"
+  },
+  {
+    "id": 46,
+    "title_cn": "时间简史",
+    "title_en": "A Brief History of Time",
+    "author": "霍金"
+  },
+  {
+    "id": 47,
+    "title_cn": "上帝掷骰子吗？",
+    "title_en": "Quantum Physics for Poets",
+    "author": "曹天元"
+  },
+  {
+    "id": 48,
+    "title_cn": "失控",
+    "title_en": "Out of Control",
+    "author": "凯文·凯利"
+  },
+  {
+    "id": 49,
+    "title_cn": "必然",
+    "title_en": "The Inevitable",
+    "author": "凯文·凯利"
+  },
+  {
+    "id": 50,
+    "title_cn": "奇点临近",
+    "title_en": "The Singularity Is Near",
+    "author": "库兹韦尔"
+  },
+  {
+    "id": 51,
+    "title_cn": "万物简史",
+    "title_en": "A Short History of Nearly Everything",
+    "author": "比尔·布莱森"
+  },
+  {
+    "id": 52,
+    "title_cn": "盲眼钟表匠",
+    "title_en": "The Blind Watchmaker",
+    "author": "理查德·道金斯"
+  },
+  {
+    "id": 53,
+    "title_cn": "生命 3.0",
+    "title_en": "Life 3.0",
+    "author": "马克斯·泰格马克"
+  },
+  {
+    "id": 54,
+    "title_cn": "暗淡蓝点",
+    "title_en": "Pale Blue Dot",
+    "author": "卡尔·萨根"
+  },
+  {
+    "id": 55,
+    "title_cn": "信息简史",
+    "title_en": "The Information",
+    "author": "詹姆斯·格雷克"
+  },
+  {
+    "id": 56,
+    "title_cn": "混沌",
+    "title_en": "Chaos: Making a New Science",
+    "author": "詹姆斯·格雷克"
+  },
+  {
+    "id": 57,
+    "title_cn": "数字化生存",
+    "title_en": "Being Digital",
+    "author": "尼葛洛庞帝"
+  },
+  {
+    "id": 58,
+    "title_cn": "超级智能",
+    "title_en": "Superintelligence",
+    "author": "尼克·波斯特洛姆"
+  },
+  {
+    "id": 59,
+    "title_cn": "从一到无穷大",
+    "title_en": "One Two Three... Infinity",
+    "author": "乔治·伽莫夫"
+  },
+  {
+    "id": 60,
+    "title_cn": "复杂",
+    "title_en": "Complexity",
+    "author": "米歇尔·沃尔德罗普"
+  },
+  {
+    "id": 61,
+    "title_cn": "沉思录",
+    "title_en": "Meditations",
+    "author": "马可·奥勒留"
+  },
+  {
+    "id": 62,
+    "title_cn": "活出生命的意义",
+    "title_en": "Man's Search for Meaning",
+    "author": "维克多·弗兰克尔"
+  },
+  {
+    "id": 63,
+    "title_cn": "存在与虚无",
+    "title_en": "Being and Nothingness",
+    "author": "萨特"
+  },
+  {
+    "id": 64,
+    "title_cn": "西西弗神话",
+    "title_en": "The Myth of Sisyphus",
+    "author": "加缪"
+  },
+  {
+    "id": 65,
+    "title_cn": "权力意志",
+    "title_en": "The Will to Power",
+    "author": "尼采"
+  },
+  {
+    "id": 66,
+    "title_cn": "艺术的故事",
+    "title_en": "The Story of Art",
+    "author": "贡布里希"
+  },
+  {
+    "id": 67,
+    "title_cn": "观看之道",
+    "title_en": "Ways of Seeing",
+    "author": "约翰·伯格"
+  },
+  {
+    "id": 68,
+    "title_cn": "设计中的设计",
+    "title_en": "Designing Design",
+    "author": "原研哉"
+  },
+  {
+    "id": 69,
+    "title_cn": "瓦尔登湖",
+    "title_en": "Walden",
+    "author": "梭罗"
+  },
+  {
+    "id": 70,
+    "title_cn": "理想国",
+    "title_en": "The Republic",
+    "author": "柏拉图"
+  },
+  {
+    "id": 71,
+    "title_cn": "论人类不平等的起源",
+    "title_en": "Discourse on Inequality",
+    "author": "卢梭"
+  },
+  {
+    "id": 72,
+    "title_cn": "孤独的散步者的遐想",
+    "title_en": "Reveries of the Solitary Walker",
+    "author": "卢梭"
+  },
+  {
+    "id": 73,
+    "title_cn": "叔本华的治疗",
+    "title_en": "The Schopenhauer Cure",
+    "author": "欧文·亚隆"
+  },
+  {
+    "id": 74,
+    "title_cn": "动机与人格",
+    "title_en": "Motivation and Personality",
+    "author": "马斯洛"
+  },
+  {
+    "id": 75,
+    "title_cn": "荣格自传",
+    "title_en": "Memories, Dreams, Reflections",
+    "author": "荣格"
+  },
+  {
+    "id": 76,
+    "title_cn": "众病之王：癌症传",
+    "title_en": "The Emperor of All Maladies",
+    "author": "悉达多·穆克吉"
+  },
+  {
+    "id": 77,
+    "title_cn": "基因传",
+    "title_en": "The Gene",
+    "author": "悉达多·穆克吉"
+  },
+  {
+    "id": 78,
+    "title_cn": "人体简史",
+    "title_en": "The Body",
+    "author": "比尔·布莱森"
+  },
+  {
+    "id": 79,
+    "title_cn": "睡眠革命",
+    "title_en": "Why We Sleep",
+    "author": "马修·沃克"
+  },
+  {
+    "id": 80,
+    "title_cn": "最好的告别",
+    "title_en": "Being Mortal",
+    "author": "阿图·葛文德"
+  },
+  {
+    "id": 81,
+    "title_cn": "肠子的小心思",
+    "title_en": "Gut",
+    "author": "朱莉娅·恩德斯"
+  },
+  {
+    "id": 82,
+    "title_cn": "习惯的力量",
+    "title_en": "The Power of Habit",
+    "author": "查尔斯·都希格"
+  },
+  {
+    "id": 83,
+    "title_cn": "大脑的未来",
+    "title_en": "The Future of the Mind",
+    "author": "加来道雄"
+  },
+  {
+    "id": 84,
+    "title_cn": "深度工作",
+    "title_en": "Deep Work",
+    "author": "卡尔·纽波特"
+  },
+  {
+    "id": 85,
+    "title_cn": "当呼吸化为空气",
+    "title_en": "When Breath Becomes Air",
+    "author": "保罗·卡拉尼什"
+  },
+  {
+    "id": 86,
+    "title_cn": "乔布斯传",
+    "title_en": "Steve Jobs",
+    "author": "沃尔特·艾萨克森"
+  },
+  {
+    "id": 87,
+    "title_cn": "埃隆·马斯克传",
+    "title_en": "Elon Musk",
+    "author": "艾萨克森"
+  },
+  {
+    "id": 88,
+    "title_cn": "富兰克林自传",
+    "title_en": "The Autobiography of Benjamin Franklin",
+    "author": ""
+  },
+  {
+    "id": 89,
+    "title_cn": "列奥纳多·达·芬奇传",
+    "title_en": "Leonardo da Vinci",
+    "author": "艾萨克森"
+  },
+  {
+    "id": 90,
+    "title_cn": "卡拉马佐夫兄弟",
+    "title_en": "The Brothers Karamazov",
+    "author": "陀思妥耶夫斯基"
+  },
+  {
+    "id": 91,
+    "title_cn": "1984",
+    "title_en": "",
+    "author": "乔治·奥威尔"
+  },
+  {
+    "id": 92,
+    "title_cn": "美丽新世界",
+    "title_en": "Brave New World",
+    "author": "赫胥黎"
+  },
+  {
+    "id": 93,
+    "title_cn": "阿特拉斯耸耸肩",
+    "title_en": "Atlas Shrugged",
+    "author": "安·兰德"
+  },
+  {
+    "id": 94,
+    "title_cn": "活着",
+    "title_en": "",
+    "author": "余华"
+  },
+  {
+    "id": 95,
+    "title_cn": "三体",
+    "title_en": "The Three-Body Problem",
+    "author": "刘慈欣"
+  },
+  {
+    "id": 96,
+    "title_cn": "悉达多",
+    "title_en": "Siddhartha",
+    "author": "赫尔曼·黑塞"
+  },
+  {
+    "id": 97,
+    "title_cn": "禅与摩托车维修艺术",
+    "title_en": "Zen and the Art of Motorcycle Maintenance",
+    "author": ""
+  },
+  {
+    "id": 98,
+    "title_cn": "小王子",
+    "title_en": "The Little Prince",
+    "author": "圣埃克苏佩里"
+  },
+  {
+    "id": 99,
+    "title_cn": "局外人",
+    "title_en": "The Stranger",
+    "author": "加缪"
+  },
+  {
+    "id": 100,
+    "title_cn": "物种起源",
+    "title_en": "On the Origin of Species",
+    "author": "达尔文"
+  }
+]
+

@@ -1,0 +1,16 @@
+{
+  "name": "book-journey",
+  "version": "0.1.0",
+  "description": "移动优先的每日书籍洞见应用",
+  "main": "server.js",
+  "type": "module",
+  "scripts": {
+    "start": "node server.js",
+    "dev": "NODE_ENV=development node server.js",
+    "test": "node test.js"
+  },
+  "engines": {
+    "node": ">=18"
+  }
+}
+
