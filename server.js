@@ -467,14 +467,22 @@ const ensureSummary = async (bookId) => {
   const cached = cache[bookId];
   
   // 如果已缓存且已批准，直接返回（不包含审核状态字段）
+  // 注意：旧内容可能不符合新的字数要求，但已经批准过，所以直接返回
   if (cached && cached.status === "approved") {
-    return {
-      resonance: cached.resonance,
-      deep_dive: cached.deep_dive,
-      masterclass: cached.masterclass,
-      createdAt: cached.createdAt,
-      source: cached.source
-    };
+    // 检查内容是否存在
+    if (!cached.resonance || !cached.deep_dive || !cached.masterclass) {
+      console.warn(`⚠️  Book ${bookId} has approved status but missing content, regenerating...`);
+      delete cache[bookId];
+      await writeCache(cache);
+    } else {
+      return {
+        resonance: cached.resonance,
+        deep_dive: cached.deep_dive,
+        masterclass: cached.masterclass,
+        createdAt: cached.createdAt,
+        source: cached.source
+      };
+    }
   }
   
   // 如果存在但状态不是 approved，删除并重新生成
@@ -1044,11 +1052,13 @@ const requestListener = async (req, res) => {
       return sendJson(res, 200, { summary });
     } catch (err) {
       console.error(`   ❌ Error in ensureSummary:`, err);
+      console.error(`   ❌ Error stack:`, err.stack);
       
       // 所有错误返回 500（不再有 202 状态码，因为不再有 pending 状态）
       return sendJson(res, 500, { 
         error: "无法生成摘要",
-        details: err.message 
+        details: err.message,
+        stack: process.env.NODE_ENV === 'development' ? err.stack : undefined
       });
     }
   }
@@ -1158,27 +1168,32 @@ const smartPreGenerate = async () => {
             
             console.log(`   📚 ${item.date}: 生成 ${item.book}...`);
             
-            const summary = await callDeepSeek(book);
-            const validation = validateSummary(summary);
-            
-            if (validation.valid) {
-              const summaryWithStatus = {
-                ...summary,
-                status: "approved",
-                validationIssues: [],
-                reviewedAt: Date.now(),
-                reviewedBy: "system",
-                createdAt: Date.now(),
-                source: "deepseek"
-              };
+            try {
+              const summary = await callDeepSeek(book);
+              const validation = validateSummary(summary);
               
-              const updatedCache = await readCache();
-              updatedCache[book.id] = summaryWithStatus;
-              await writeCache(updatedCache);
-              console.log(`   ✅ ${item.date}: ${item.book} 已生成并批准`);
-              successCount++;
-            } else {
-              console.error(`   ⚠️  ${item.date}: ${item.book} 质量检查未通过: ${validation.issues.join(", ")}`);
+              if (validation.valid) {
+                const summaryWithStatus = {
+                  ...summary,
+                  status: "approved",
+                  validationIssues: [],
+                  reviewedAt: Date.now(),
+                  reviewedBy: "system",
+                  createdAt: Date.now(),
+                  source: "deepseek"
+                };
+                
+                const updatedCache = await readCache();
+                updatedCache[book.id] = summaryWithStatus;
+                await writeCache(updatedCache);
+                console.log(`   ✅ ${item.date}: ${item.book} 已生成并批准`);
+                successCount++;
+              } else {
+                console.error(`   ⚠️  ${item.date}: ${item.book} 质量检查未通过: ${validation.issues.join(", ")}`);
+                errorCount++;
+              }
+            } catch (genErr) {
+              console.error(`   ❌ ${item.date}: ${item.book} 生成过程出错:`, genErr.message);
               errorCount++;
             }
             
@@ -1207,6 +1222,7 @@ const smartPreGenerate = async () => {
     }
   } catch (err) {
     console.error('❌ 智能预生成失败:', err);
+    console.error('   错误堆栈:', err.stack);
   }
 };
 
@@ -1215,8 +1231,10 @@ setTimeout(() => {
   console.log('🚀 启动智能预生成检查...');
   smartPreGenerate().catch(err => {
     console.error('❌ 启动时智能预生成失败:', err);
+    console.error('   错误堆栈:', err.stack);
+    // 不抛出错误，让服务器继续运行
   });
-}, 5000); // 延迟5秒，确保服务器完全启动
+}, 10000); // 延迟10秒，确保服务器完全启动并处理初始请求
 
 // 每天凌晨2点执行智能预生成（使用简单的定时器，不依赖外部库）
 const scheduleDailyPreGenerate = () => {
