@@ -288,22 +288,133 @@ const callDeepSeek = async (book) => {
   }
 };
 
+// 质量检查函数
+const validateSummary = (summary) => {
+  const issues = [];
+  
+  // 检查三个版本是否存在
+  if (!summary.resonance || !summary.deep_dive || !summary.masterclass) {
+    issues.push("缺少一个或多个版本");
+    return { valid: false, issues };
+  }
+  
+  // 检查版本是否相同
+  if (summary.resonance === summary.deep_dive || 
+      summary.resonance === summary.masterclass || 
+      summary.deep_dive === summary.masterclass) {
+    issues.push("部分版本内容相同");
+  }
+  
+  // 检查长度
+  if (summary.resonance.length < 200) {
+    issues.push("精华版过短（少于200字）");
+  }
+  if (summary.deep_dive.length < 800) {
+    issues.push("思考版过短（少于800字）");
+  }
+  if (summary.masterclass.length < 1500) {
+    issues.push("沉浸版过短（少于1500字）");
+  }
+  
+  // 检查格式问题（过多的换行）
+  const checkFormatting = (text) => {
+    const newlineCount = (text.match(/\n/g) || []).length;
+    const ratio = newlineCount / text.length;
+    return ratio > 0.02; // 每50个字符超过1个换行
+  };
+  
+  if (checkFormatting(summary.resonance)) {
+    issues.push("精华版格式异常（换行过多）");
+  }
+  
+  // 检查是否包含明显的错误标记
+  const hasErrorMarkers = (text) => {
+    return text.includes("生成摘要时出错") || 
+           text.includes("Failed to") ||
+           text.includes("Error:") ||
+           text.includes("错误");
+  };
+  
+  if (hasErrorMarkers(summary.resonance) || 
+      hasErrorMarkers(summary.deep_dive) || 
+      hasErrorMarkers(summary.masterclass)) {
+    issues.push("包含错误信息");
+  }
+  
+  return {
+    valid: issues.length === 0,
+    issues
+  };
+};
+
 const ensureSummary = async (bookId) => {
   const cache = await readCache();
-  if (cache[bookId]) return cache[bookId];
-
+  const cached = cache[bookId];
+  
+  // 如果已缓存且已批准，直接返回（不包含审核状态字段）
+  if (cached && cached.status === "approved") {
+    return {
+      resonance: cached.resonance,
+      deep_dive: cached.deep_dive,
+      masterclass: cached.masterclass,
+      createdAt: cached.createdAt,
+      source: cached.source
+    };
+  }
+  
+  // 如果已缓存但未批准，返回待审核提示
+  if (cached && cached.status === "pending") {
+    throw new Error("内容审核中，请稍后再试");
+  }
+  
+  // 如果被拒绝，删除并重新生成
+  if (cached && cached.status === "rejected") {
+    delete cache[bookId];
+    await writeCache(cache);
+  }
+  
+  // 生成新摘要
   const book = books.find((b) => b.id === bookId);
   if (!book) throw new Error("Book not found");
-
+  
   try {
     const summary = await callDeepSeek(book);
-    cache[bookId] = summary;
+    
+    // 自动质量检查
+    const validation = validateSummary(summary);
+    
+    // 设置审核状态
+    const summaryWithStatus = {
+      ...summary,
+      status: validation.valid ? "pending" : "rejected",
+      validationIssues: validation.issues,
+      reviewedAt: null,
+      reviewedBy: null,
+      createdAt: summary.createdAt || Date.now(),
+      source: summary.source || "deepseek"
+    };
+    
+    cache[bookId] = summaryWithStatus;
     await writeCache(cache);
-    return summary;
+    
+    // 如果自动检查失败，抛出错误
+    if (!validation.valid) {
+      console.warn(`⚠️  Book ${bookId} summary failed validation:`, validation.issues);
+      throw new Error(`内容质量检查未通过: ${validation.issues.join(", ")}`);
+    }
+    
+    // 如果通过检查但需要审核，返回待审核提示
+    throw new Error("内容已生成，等待审核中");
+    
   } catch (err) {
+    // 如果是审核相关的错误，直接抛出
+    if (err.message.includes("审核") || err.message.includes("质量检查")) {
+      throw err;
+    }
+    
+    // 其他错误，返回错误摘要
     console.error(`❌ Failed to generate summary for book ${bookId}:`, err.message);
     console.error(`   Full error:`, err);
-    // Return a more helpful error message
     const errorMsg = err.message || "未知错误";
     return {
       resonance: `生成摘要时出错: ${errorMsg}。请检查服务器日志获取详细信息。`,
@@ -486,6 +597,190 @@ const requestListener = async (req, res) => {
     } catch (err) {
       console.error(err);
       return sendJson(res, 500, { error: "无法获取指定日期的书目" });
+    }
+  }
+
+  // 审核管理 API
+  
+  // 获取待审核列表
+  if (req.method === "GET" && urlObj.pathname === "/api/admin/pending") {
+    try {
+      const cache = await readCache();
+      const pending = [];
+      
+      for (const [id, summary] of Object.entries(cache)) {
+        if (summary.status === "pending") {
+          const book = books.find(b => b.id === Number(id));
+          pending.push({
+            bookId: Number(id),
+            book: book ? {
+              id: book.id,
+              title_cn: book.title_cn,
+              title_en: book.title_en,
+              author: book.author
+            } : null,
+            summary: {
+              resonance: summary.resonance ? summary.resonance.substring(0, 300) + "..." : "",
+              deep_dive: summary.deep_dive ? summary.deep_dive.substring(0, 300) + "..." : "",
+              masterclass: summary.masterclass ? summary.masterclass.substring(0, 300) + "..." : ""
+            },
+            validationIssues: summary.validationIssues || [],
+            createdAt: summary.createdAt,
+            fullSummary: summary // 包含完整内容用于审核
+          });
+        }
+      }
+      
+      // 按创建时间排序
+      pending.sort((a, b) => a.createdAt - b.createdAt);
+      
+      return sendJson(res, 200, { 
+        count: pending.length,
+        pending 
+      });
+    } catch (err) {
+      console.error("Error fetching pending:", err);
+      return sendJson(res, 500, { error: "无法获取待审核列表" });
+    }
+  }
+  
+  // 批准内容
+  if (req.method === "POST" && urlObj.pathname === "/api/admin/approve") {
+    try {
+      const body = await new Promise((resolve, reject) => {
+        let data = "";
+        req.on("data", chunk => { data += chunk; });
+        req.on("end", () => {
+          try {
+            resolve(data ? JSON.parse(data) : {});
+          } catch (e) {
+            reject(e);
+          }
+        });
+        req.on("error", reject);
+      });
+      
+      const { bookId } = body;
+      if (!bookId) {
+        return sendJson(res, 400, { error: "缺少 bookId 参数" });
+      }
+      
+      const cache = await readCache();
+      
+      if (!cache[bookId]) {
+        return sendJson(res, 404, { error: "摘要不存在" });
+      }
+      
+      cache[bookId].status = "approved";
+      cache[bookId].reviewedAt = Date.now();
+      cache[bookId].reviewedBy = "admin"; // 可以后续添加实际用户信息
+      
+      await writeCache(cache);
+      
+      console.log(`✅ Book ${bookId} summary approved`);
+      
+      return sendJson(res, 200, { 
+        success: true,
+        message: `书籍 ${bookId} 的摘要已批准`
+      });
+    } catch (err) {
+      console.error("Error approving summary:", err);
+      return sendJson(res, 500, { error: "批准失败" });
+    }
+  }
+  
+  // 拒绝内容
+  if (req.method === "POST" && urlObj.pathname === "/api/admin/reject") {
+    try {
+      const body = await new Promise((resolve, reject) => {
+        let data = "";
+        req.on("data", chunk => { data += chunk; });
+        req.on("end", () => {
+          try {
+            resolve(data ? JSON.parse(data) : {});
+          } catch (e) {
+            reject(e);
+          }
+        });
+        req.on("error", reject);
+      });
+      
+      const { bookId, reason } = body;
+      if (!bookId) {
+        return sendJson(res, 400, { error: "缺少 bookId 参数" });
+      }
+      
+      const cache = await readCache();
+      
+      if (!cache[bookId]) {
+        return sendJson(res, 404, { error: "摘要不存在" });
+      }
+      
+      // 删除缓存，下次访问会重新生成
+      delete cache[bookId];
+      await writeCache(cache);
+      
+      console.log(`❌ Book ${bookId} summary rejected${reason ? `: ${reason}` : ""}`);
+      
+      return sendJson(res, 200, { 
+        success: true,
+        message: `书籍 ${bookId} 的摘要已拒绝，将在下次访问时重新生成`
+      });
+    } catch (err) {
+      console.error("Error rejecting summary:", err);
+      return sendJson(res, 500, { error: "拒绝失败" });
+    }
+  }
+  
+  // 批量批准
+  if (req.method === "POST" && urlObj.pathname === "/api/admin/approve-batch") {
+    try {
+      const body = await new Promise((resolve, reject) => {
+        let data = "";
+        req.on("data", chunk => { data += chunk; });
+        req.on("end", () => {
+          try {
+            resolve(data ? JSON.parse(data) : {});
+          } catch (e) {
+            reject(e);
+          }
+        });
+        req.on("error", reject);
+      });
+      
+      const { bookIds } = body;
+      if (!Array.isArray(bookIds) || bookIds.length === 0) {
+        return sendJson(res, 400, { error: "缺少 bookIds 数组" });
+      }
+      
+      const cache = await readCache();
+      const approved = [];
+      const notFound = [];
+      
+      for (const bookId of bookIds) {
+        if (cache[bookId]) {
+          cache[bookId].status = "approved";
+          cache[bookId].reviewedAt = Date.now();
+          cache[bookId].reviewedBy = "admin";
+          approved.push(bookId);
+        } else {
+          notFound.push(bookId);
+        }
+      }
+      
+      await writeCache(cache);
+      
+      console.log(`✅ Batch approved ${approved.length} summaries`);
+      
+      return sendJson(res, 200, { 
+        success: true,
+        approved: approved.length,
+        notFound: notFound.length,
+        message: `已批准 ${approved.length} 个摘要`
+      });
+    } catch (err) {
+      console.error("Error batch approving:", err);
+      return sendJson(res, 500, { error: "批量批准失败" });
     }
   }
 
