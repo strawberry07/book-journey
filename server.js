@@ -1260,31 +1260,50 @@ setTimeout(() => {
 }, 10000); // 延迟10秒，确保服务器完全启动并处理初始请求
 
 // 每天凌晨2点执行智能预生成（使用简单的定时器，不依赖外部库）
-const scheduleDailyPreGenerate = () => {
-  const now = new Date();
-  const tomorrow = new Date(now);
-  tomorrow.setDate(tomorrow.getDate() + 1);
-  tomorrow.setHours(2, 0, 0, 0); // 设置为明天凌晨2点
+// 延迟执行，确保服务器完全启动
+setTimeout(() => {
+  const scheduleDailyPreGenerate = () => {
+    try {
+      const now = new Date();
+      const tomorrow = new Date(now);
+      tomorrow.setDate(tomorrow.getDate() + 1);
+      tomorrow.setHours(2, 0, 0, 0); // 设置为明天凌晨2点
+      
+      const msUntilTomorrow = tomorrow.getTime() - now.getTime();
+      
+      setTimeout(() => {
+        console.log('🕐 定时任务：开始每日智能预生成...');
+        smartPreGenerate().catch(err => {
+          console.error('❌ 定时智能预生成失败:', err);
+          console.error('   错误堆栈:', err.stack);
+        });
+        
+        // 设置每天重复执行
+        setInterval(() => {
+          console.log('🕐 定时任务：开始每日智能预生成...');
+          smartPreGenerate().catch(err => {
+            console.error('❌ 定时智能预生成失败:', err);
+            console.error('   错误堆栈:', err.stack);
+          });
+        }, 24 * 60 * 60 * 1000); // 每24小时执行一次
+      }, msUntilTomorrow);
+      
+      console.log(`⏰ 已设置定时任务，将在 ${tomorrow.toLocaleString('zh-CN')} 执行首次预生成`);
+    } catch (err) {
+      console.error('❌ 设置定时任务失败:', err);
+      console.error('   错误堆栈:', err.stack);
+    }
+  };
   
-  const msUntilTomorrow = tomorrow.getTime() - now.getTime();
-  
-  setTimeout(() => {
-    console.log('🕐 定时任务：开始每日智能预生成...');
-    smartPreGenerate().catch(err => {
-      console.error('❌ 定时智能预生成失败:', err);
-    });
-    
-    // 设置每天重复执行
-    setInterval(() => {
-      console.log('🕐 定时任务：开始每日智能预生成...');
-      smartPreGenerate().catch(err => {
-        console.error('❌ 定时智能预生成失败:', err);
-      });
-    }, 24 * 60 * 60 * 1000); // 每24小时执行一次
-  }, msUntilTomorrow);
-  
-  console.log(`⏰ 已设置定时任务，将在 ${tomorrow.toLocaleString('zh-CN')} 执行首次预生成`);
-};
-
-scheduleDailyPreGenerate();
+  // 延迟执行定时任务设置，确保服务器完全启动
+setTimeout(() => {
+  try {
+    scheduleDailyPreGenerate();
+  } catch (err) {
+    console.error('❌ 设置定时任务失败:', err);
+    console.error('   错误堆栈:', err.stack);
+    // 不抛出错误，让服务器继续运行
+  }
+}, 15000); // 延迟15秒，确保服务器完全启动
+}, 15000); // 延迟15秒，确保服务器完全启动
 
