@@ -107,6 +107,154 @@ const getTodaysBook = async () => {
   return getBookForDate(today);
 };
 
+// 质量检查函数（需要在 preGenerateSummaries 之前定义）
+const validateSummary = (summary) => {
+  const issues = [];
+  
+  // 检查三个版本是否存在
+  if (!summary.resonance || !summary.deep_dive || !summary.masterclass) {
+    issues.push("缺少一个或多个版本");
+    return { valid: false, issues };
+  }
+  
+  // 检查版本是否相同
+  if (summary.resonance === summary.deep_dive || 
+      summary.resonance === summary.masterclass || 
+      summary.deep_dive === summary.masterclass) {
+    issues.push("部分版本内容相同");
+  }
+  
+  // 检查长度
+  if (summary.resonance.length < 200) {
+    issues.push("精华版过短（少于200字）");
+  }
+  if (summary.deep_dive.length < 800) {
+    issues.push("思考版过短（少于800字）");
+  }
+  if (summary.masterclass.length < 1500) {
+    issues.push("沉浸版过短（少于1500字）");
+  }
+  
+  // 检查格式问题（过多的换行）
+  const checkFormatting = (text) => {
+    const newlineCount = (text.match(/\n/g) || []).length;
+    const ratio = newlineCount / text.length;
+    return ratio > 0.02; // 每50个字符超过1个换行
+  };
+  
+  if (checkFormatting(summary.resonance)) {
+    issues.push("精华版格式异常（换行过多）");
+  }
+  
+  // 检查是否包含明显的错误标记
+  const hasErrorMarkers = (text) => {
+    return text.includes("生成摘要时出错") || 
+           text.includes("Failed to") ||
+           text.includes("Error:") ||
+           text.includes("错误");
+  };
+  
+  if (hasErrorMarkers(summary.resonance) || 
+      hasErrorMarkers(summary.deep_dive) || 
+      hasErrorMarkers(summary.masterclass)) {
+    issues.push("包含错误信息");
+  }
+  
+  return {
+    valid: issues.length === 0,
+    issues
+  };
+};
+
+// 预生成函数：批量生成未来N天的书籍摘要
+const preGenerateSummaries = async (count = 10) => {
+  const cache = await readCache();
+  const today = new Date();
+  const results = {
+    generated: [],
+    skipped: [],
+    errors: []
+  };
+
+  console.log(`🚀 开始预生成未来 ${count} 天的书籍摘要...`);
+
+  for (let i = 0; i < count; i++) {
+    const futureDate = new Date(today);
+    futureDate.setDate(today.getDate() + i);
+    const dateStr = futureDate.toISOString().split("T")[0];
+    
+    try {
+      const book = await getBookForDate(dateStr);
+      
+      // 检查是否已存在且已批准
+      if (cache[book.id] && cache[book.id].status === "approved") {
+        console.log(`⏭️  [${i + 1}/${count}] ${dateStr}: 书籍 ${book.id}《${book.title_cn}》已批准，跳过`);
+        results.skipped.push({ date: dateStr, bookId: book.id, book: book.title_cn, reason: "已批准" });
+        continue;
+      }
+
+      // 检查是否已存在但待审核
+      if (cache[book.id] && cache[book.id].status === "pending") {
+        console.log(`⏳ [${i + 1}/${count}] ${dateStr}: 书籍 ${book.id}《${book.title_cn}》待审核，跳过`);
+        results.skipped.push({ date: dateStr, bookId: book.id, book: book.title_cn, reason: "待审核" });
+        continue;
+      }
+
+      console.log(`📚 [${i + 1}/${count}] ${dateStr}: 生成书籍 ${book.id}《${book.title_cn}》...`);
+
+      // 直接调用 callDeepSeek 生成摘要，然后手动设置状态
+      try {
+        const summary = await callDeepSeek(book);
+        
+        // 自动质量检查
+        const validation = validateSummary(summary);
+        
+        // 设置审核状态
+        const summaryWithStatus = {
+          ...summary,
+          status: validation.valid ? "pending" : "rejected",
+          validationIssues: validation.issues,
+          reviewedAt: null,
+          reviewedBy: null,
+          createdAt: summary.createdAt || Date.now(),
+          source: summary.source || "deepseek"
+        };
+        
+        // 保存到缓存
+        const updatedCache = await readCache();
+        updatedCache[book.id] = summaryWithStatus;
+        await writeCache(updatedCache);
+        
+        const status = summaryWithStatus.status;
+        if (status === "pending") {
+          console.log(`   ✅ 生成成功，等待审核`);
+        } else {
+          console.log(`   ⚠️  生成成功但质量检查未通过: ${validation.issues.join(", ")}`);
+        }
+        results.generated.push({ date: dateStr, bookId: book.id, book: book.title_cn, status, issues: validation.issues });
+      } catch (err) {
+        throw err;
+      }
+
+      // 添加延迟，避免 API 限流
+      if (i < count - 1) {
+        await new Promise(resolve => setTimeout(resolve, 2000)); // 等待2秒
+      }
+
+    } catch (err) {
+      console.error(`   ❌ 生成失败: ${err.message}`);
+      results.errors.push({ date: dateStr, error: err.message });
+    }
+  }
+
+  console.log(`\n📊 预生成完成！`);
+  console.log(`   ✅ 成功生成: ${results.generated.length}`);
+  console.log(`   ⏭️  跳过: ${results.skipped.length}`);
+  console.log(`   ❌ 失败: ${results.errors.length}`);
+
+  return results;
+};
+
 const buildPrompt = (book) => {
   const basePrompt = `### ROLE
 你是一位博学的朋友和思考伙伴，用温暖、真诚、易懂的语言分享书籍的智慧。请为《${book.title_cn}》（${book.title_en}）作者：${book.author} 提供三版摘要。
@@ -286,65 +434,6 @@ const callDeepSeek = async (book) => {
     }
     throw err; // Re-throw so the caller can handle it
   }
-};
-
-// 质量检查函数
-const validateSummary = (summary) => {
-  const issues = [];
-  
-  // 检查三个版本是否存在
-  if (!summary.resonance || !summary.deep_dive || !summary.masterclass) {
-    issues.push("缺少一个或多个版本");
-    return { valid: false, issues };
-  }
-  
-  // 检查版本是否相同
-  if (summary.resonance === summary.deep_dive || 
-      summary.resonance === summary.masterclass || 
-      summary.deep_dive === summary.masterclass) {
-    issues.push("部分版本内容相同");
-  }
-  
-  // 检查长度
-  if (summary.resonance.length < 200) {
-    issues.push("精华版过短（少于200字）");
-  }
-  if (summary.deep_dive.length < 800) {
-    issues.push("思考版过短（少于800字）");
-  }
-  if (summary.masterclass.length < 1500) {
-    issues.push("沉浸版过短（少于1500字）");
-  }
-  
-  // 检查格式问题（过多的换行）
-  const checkFormatting = (text) => {
-    const newlineCount = (text.match(/\n/g) || []).length;
-    const ratio = newlineCount / text.length;
-    return ratio > 0.02; // 每50个字符超过1个换行
-  };
-  
-  if (checkFormatting(summary.resonance)) {
-    issues.push("精华版格式异常（换行过多）");
-  }
-  
-  // 检查是否包含明显的错误标记
-  const hasErrorMarkers = (text) => {
-    return text.includes("生成摘要时出错") || 
-           text.includes("Failed to") ||
-           text.includes("Error:") ||
-           text.includes("错误");
-  };
-  
-  if (hasErrorMarkers(summary.resonance) || 
-      hasErrorMarkers(summary.deep_dive) || 
-      hasErrorMarkers(summary.masterclass)) {
-    issues.push("包含错误信息");
-  }
-  
-  return {
-    valid: issues.length === 0,
-    issues
-  };
 };
 
 const ensureSummary = async (bookId) => {
@@ -732,6 +821,46 @@ const requestListener = async (req, res) => {
     }
   }
   
+  // 预生成 API（后台任务）
+  if (req.method === "POST" && urlObj.pathname === "/api/admin/pre-generate") {
+    try {
+      const body = await new Promise((resolve, reject) => {
+        let data = "";
+        req.on("data", chunk => { data += chunk; });
+        req.on("end", () => {
+          try {
+            resolve(data ? JSON.parse(data) : {});
+          } catch (e) {
+            reject(e);
+          }
+        });
+        req.on("error", reject);
+      });
+      
+      const { count = 10 } = body;
+      
+      if (count <= 0 || count > 100) {
+        return sendJson(res, 400, { error: "数量必须在 1-100 之间" });
+      }
+      
+      // 异步执行预生成（不阻塞响应）
+      preGenerateSummaries(count).then(results => {
+        console.log("✅ Pre-generation completed:", results);
+      }).catch(err => {
+        console.error("❌ Pre-generation error:", err);
+      });
+      
+      return sendJson(res, 200, { 
+        success: true,
+        message: `已开始预生成 ${count} 天的内容，请稍后查看管理界面`,
+        count
+      });
+    } catch (err) {
+      console.error("Error starting pre-generation:", err);
+      return sendJson(res, 500, { error: "启动预生成失败" });
+    }
+  }
+
   // 批量批准
   if (req.method === "POST" && urlObj.pathname === "/api/admin/approve-batch") {
     try {
