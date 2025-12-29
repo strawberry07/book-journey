@@ -117,87 +117,8 @@ const renderSummary = (depth, content) => {
     .replace(/\*\*(.+?)\*\*/g, '<strong>$1</strong>') // **bold** to <strong>
     .replace(/\*(.+?)\*/g, '<em>$1</em>'); // *italic* to <em>
   
-  // Find "每日金句" or "黄金箴言" and highlight only the quote (not the interpretation)
-  const highlightMarkers = ["每日金句", "黄金箴言"];
-  let markerIndex = -1;
-  let highlightMarker = "";
-  
-  for (const marker of highlightMarkers) {
-    const idx = processedContent.indexOf(marker);
-    if (idx !== -1) {
-      markerIndex = idx;
-      highlightMarker = marker;
-      break;
-    }
-  }
-  
-  if (markerIndex !== -1) {
-    // Split at the marker
-    const beforeMarker = processedContent.substring(0, markerIndex + highlightMarker.length);
-    let afterMarker = processedContent.substring(markerIndex + highlightMarker.length);
-    
-    // Remove leading punctuation/spaces
-    afterMarker = afterMarker.replace(/^[：:，,。.\s]+/, '');
-    
-    // Find the quote - look for text until interpretation markers or next section
-    // Interpretation markers: "这句话", "这", "它", "这个观点", etc.
-    const interpretationStartPattern = /(这句话|这|它|这个观点|这种|这种观点|这种思想|这体现了|这说明了|这反映了|这揭示了|这展现了|这表达了|这传递了|这诠释了|这阐释了|这揭示了|这彰显了|这昭示了|这暗示了|这暗示|这意味着|这代表|这象征)/i;
-    const interpretationMatch = afterMarker.match(interpretationStartPattern);
-    
-    let quote = "";
-    let rest = "";
-    
-    if (interpretationMatch) {
-      // Found interpretation text, extract quote before it
-      const interpretationStart = interpretationMatch.index;
-      quote = afterMarker.substring(0, interpretationStart).trim();
-      
-      // Find where interpretation ends (usually at next <br/> or section)
-      const afterInterpretation = afterMarker.substring(interpretationStart);
-      const interpretationEnd = afterInterpretation.search(/<br\/><br\/>|<br\/>(?=[^<]*[：:])/);
-      
-      if (interpretationEnd !== -1) {
-        rest = afterInterpretation.substring(interpretationEnd);
-      } else {
-        // Remove entire interpretation sentence/paragraph
-        const sentenceEnd = afterInterpretation.search(/[。！？]<br\/>|[。！？]$/);
-        if (sentenceEnd !== -1) {
-          rest = afterInterpretation.substring(sentenceEnd + 1);
-        } else {
-          rest = "";
-        }
-      }
-    } else {
-      // No interpretation found, quote is until next <br/><br/> or section
-      const nextDoubleBreak = afterMarker.indexOf('<br/><br/>');
-      const nextSection = afterMarker.search(/<br\/>(?=[^<]*[：:])/);
-      
-      if (nextDoubleBreak !== -1) {
-        quote = afterMarker.substring(0, nextDoubleBreak).trim();
-        rest = afterMarker.substring(nextDoubleBreak);
-      } else if (nextSection !== -1) {
-        quote = afterMarker.substring(0, nextSection).trim();
-        rest = afterMarker.substring(nextSection);
-      } else {
-        // Single break or end
-        const nextBreak = afterMarker.indexOf('<br/>');
-        if (nextBreak !== -1) {
-          quote = afterMarker.substring(0, nextBreak).trim();
-          rest = afterMarker.substring(nextBreak);
-        } else {
-          quote = afterMarker.trim();
-          rest = "";
-        }
-      }
-    }
-    
-    // Clean up quote (remove trailing punctuation that might be part of interpretation)
-    quote = quote.replace(/[，,]$/, '').trim();
-    
-    // Replace marker with "每日金句" if it was "黄金箴言"
-    const finalMarker = highlightMarker === "黄金箴言" ? "每日金句" : highlightMarker;
-    processedContent = beforeMarker.replace(highlightMarker, finalMarker) + '：<span class="highlight-quote">' + quote + '</span>' + rest;
-  }
+  // Remove any "每日金句" or "黄金箴言" sections if they exist
+  processedContent = processedContent.replace(/(?:每日金句|黄金箴言)[：:][^<]*(?:<br\/>[^<]*)*?(?=<br\/><br\/>|$|(?=<br\/>[^<]*[：:]))/gi, '');
   
   // Style "今日所思" section - find all occurrences and wrap them
   const reflectionRegex = /今日所思[：:]\s*([^<]*(?:<br\/>[^<]*)*?)(?=<br\/><br\/>|$|(?=<br\/>[^<]*[：:]))/g;
@@ -278,48 +199,46 @@ nextDayBtn.addEventListener("click", () => {
   }
 });
 
-const extractQuote = (summaryContent) => {
+const extractSummary = (summaryContent) => {
   if (!summaryContent) return null;
   
-  // Look for "每日金句" or "黄金箴言" followed by the quote
-  const quotePattern = /(?:每日金句|黄金箴言)[：:]\s*([^<]+?)(?=<br\/>|$|(?:这句话|这|它|这个观点))/i;
-  const match = summaryContent.match(quotePattern);
+  // Remove HTML tags to get plain text
+  let text = summaryContent
+    .replace(/<[^>]+>/g, ' ') // Replace HTML tags with spaces
+    .replace(/&nbsp;/g, ' ')
+    .replace(/\s+/g, ' ') // Normalize whitespace
+    .trim();
   
-  if (match && match[1]) {
-    // Clean up the quote - remove HTML tags and extra whitespace
-    let quote = match[1]
-      .replace(/<[^>]+>/g, '') // Remove HTML tags
-      .replace(/&nbsp;/g, ' ')
-      .trim();
-    
-    // Remove trailing punctuation that might be part of interpretation (but keep periods)
-    quote = quote.replace(/[，,！？]$/, '').trim();
-    
-    // Ensure quote ends with a period (。) if it doesn't already end with punctuation
-    if (quote && !/[。！？]$/.test(quote)) {
-      quote += '。';
-    }
-    
-    return quote;
+  // Extract first 2-4 sentences (ending with 。！？)
+  const sentencePattern = /[^。！？]*[。！？]/g;
+  const sentences = text.match(sentencePattern);
+  
+  if (!sentences || sentences.length === 0) {
+    // Fallback: extract first 100-200 characters
+    return text.substring(0, 200).trim() + (text.length > 200 ? '...' : '');
   }
   
-  return null;
+  // Take 2-4 sentences (prefer 3-4, but at least 2)
+  const count = Math.min(Math.max(2, sentences.length), 4);
+  const summary = sentences.slice(0, count).join(' ').trim();
+  
+  return summary || null;
 };
 
-const getQuoteFromSummary = async () => {
-  // Try to get quote from currently loaded summary
+const getSummaryFromContent = async () => {
+  // Try to get summary from currently loaded summary
   if (summaryEl.innerHTML) {
-    const quote = extractQuote(summaryEl.innerHTML);
-    if (quote) return quote;
+    const summary = extractSummary(summaryEl.innerHTML);
+    if (summary) return summary;
   }
   
-  // If not loaded, fetch the resonance summary to get the quote
+  // If not loaded, fetch the resonance summary to get the summary
   try {
     const data = await fetchJson(`/api/book/${currentBook.id}/summary`);
     const resonanceContent = data.summary?.resonance || '';
-    return extractQuote(resonanceContent);
+    return extractSummary(resonanceContent);
   } catch (err) {
-    console.error("Failed to fetch quote:", err);
+    console.error("Failed to fetch summary:", err);
     return null;
   }
 };
@@ -449,7 +368,7 @@ const shareCardImage = async (shareCardStatusEl = null) => {
   await new Promise(resolve => setTimeout(resolve, 200));
   
   try {
-    const quote = await getQuoteFromSummary();
+    const summary = await getSummaryFromContent();
     const dateStr = formatDateForAPI(currentDate);
     const shareUrl = `${window.location.origin}?date=${dateStr}`;
     const file = new File([shareCardBlob], `每日书旅-${currentBook.title_cn}.png`, { type: "image/png" });
@@ -525,7 +444,7 @@ const shareCardImage = async (shareCardStatusEl = null) => {
         await new Promise(resolve => setTimeout(resolve, 200));
         await navigator.share({
           title: `每日书旅 - ${currentBook.title_cn}`,
-          text: `📚 ${currentBook.title_cn}\n${quote ? `"${quote}"` : ''}\n\n${shareUrl}`,
+          text: `📚 ${currentBook.title_cn}\n${summary ? summary : ''}\n\n${shareUrl}`,
           files: [file],
         });
           if (statusArea) {
@@ -586,7 +505,7 @@ const shareCardImage = async (shareCardStatusEl = null) => {
           await new Promise(resolve => setTimeout(resolve, 200));
         await navigator.share({
           title: `每日书旅 - ${currentBook.title_cn}`,
-          text: `📚 ${currentBook.title_cn}\n${quote ? `"${quote}"` : ''}\n\n${shareUrl}`,
+          text: `📚 ${currentBook.title_cn}\n${summary ? summary : ''}\n\n${shareUrl}`,
         });
           if (statusArea) {
             statusArea.textContent = "✅ 分享成功！";
@@ -800,7 +719,7 @@ const shareContent = async () => {
   shareCardTitleCn.textContent = `《${currentBook.title_cn}》`;
   shareCardTitleEn.textContent = currentBook.title_en || "";
   shareCardAuthor.textContent = currentBook.author || "未知作者";
-  shareCardQuote.textContent = quote || "点击查看完整内容";
+  shareCardQuote.textContent = summary || "点击查看完整内容";
   
   // Show overlay and share card - center it on screen
   shareOverlay.style.display = "block";
