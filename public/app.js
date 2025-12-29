@@ -106,11 +106,16 @@ const loadToday = () => {
 };
 
 const renderSummary = (depth, content) => {
-  // Remove markdown bold (**text**) and convert to HTML
+  // Handle escaped newlines and actual newlines
   let processedContent = content
+    // First, handle escaped newlines (\n in string literals)
+    .replace(/\\n/g, "\n")
+    // Then handle actual newlines
+    .replace(/\n\n+/g, "\n\n") // Normalize multiple newlines to double
+    .replace(/\n/g, "<br/>")
+    // Remove markdown bold (**text**) and convert to HTML
     .replace(/\*\*(.+?)\*\*/g, '<strong>$1</strong>') // **bold** to <strong>
-    .replace(/\*(.+?)\*/g, '<em>$1</em>') // *italic* to <em>
-    .replace(/\n/g, "<br/>");
+    .replace(/\*(.+?)\*/g, '<em>$1</em>'); // *italic* to <em>
   
   // Find "每日金句" or "黄金箴言" and highlight only the quote (not the interpretation)
   const highlightMarkers = ["每日金句", "黄金箴言"];

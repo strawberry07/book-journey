@@ -171,8 +171,24 @@ const buildPrompt = (book) => {
 - 必须包含"今日所思"部分，格式为："今日所思："后跟4-5个深度反思问题，引导读者深入思考，每个问题要具体、有启发性，不能是泛泛而谈
 - 用对话式的语言，像在和朋友分享心得，但内容要深入、全面，总字数必须达到2000-3000字（是之前的两倍），不能少于2000字
 
-### 输出格式
-返回JSON，包含三个键：resonance, deep_dive, masterclass。不要包含额外说明。`;
+### 输出格式（重要）
+必须返回有效的 JSON 格式，包含三个键：resonance, deep_dive, masterclass。
+
+**严格要求：**
+1. 只返回 JSON，不要包含任何其他文字、说明或代码块标记
+2. 三个版本的内容必须完全不同：
+   - resonance: 3-4段，400字，简洁有力
+   - deep_dive: 6-8个核心观点，1200-1600字，详细深入
+   - masterclass: 全面分析，2000-3000字，包含跨学科连接
+3. 每个版本的内容长度和深度必须明显不同
+4. JSON 格式示例：
+{
+  "resonance": "内容...",
+  "deep_dive": "内容...",
+  "masterclass": "内容..."
+}
+
+**不要使用 markdown 代码块，直接返回纯 JSON。**`;
 
   return basePrompt;
 };
@@ -225,7 +241,31 @@ const callDeepSeek = async (book) => {
     }
 
     try {
-      const parsed = JSON.parse(content);
+      // Try to extract JSON from the response (might be wrapped in markdown code blocks)
+      let jsonContent = content;
+      
+      // Remove markdown code blocks if present
+      const codeBlockMatch = content.match(/```(?:json)?\s*([\s\S]*?)```/);
+      if (codeBlockMatch) {
+        jsonContent = codeBlockMatch[1].trim();
+      }
+      
+      const parsed = JSON.parse(jsonContent);
+      
+      // Validate that we have all three versions
+      if (!parsed.resonance || !parsed.deep_dive || !parsed.masterclass) {
+        console.warn("⚠️  Missing one or more versions in response:", Object.keys(parsed));
+        throw new Error("Incomplete response: missing versions");
+      }
+      
+      // Ensure all three versions are different
+      if (parsed.resonance === parsed.deep_dive || parsed.resonance === parsed.masterclass || parsed.deep_dive === parsed.masterclass) {
+        console.warn("⚠️  Warning: Some versions are identical!");
+        console.warn("Resonance length:", parsed.resonance?.length);
+        console.warn("Deep dive length:", parsed.deep_dive?.length);
+        console.warn("Masterclass length:", parsed.masterclass?.length);
+      }
+      
       return {
         resonance: parsed.resonance,
         deep_dive: parsed.deep_dive,
@@ -234,13 +274,11 @@ const callDeepSeek = async (book) => {
         source: "deepseek",
       };
     } catch (err) {
-      return {
-        resonance: content,
-        deep_dive: content,
-        masterclass: content,
-        createdAt: Date.now(),
-        source: "deepseek-raw",
-      };
+      console.error("❌ Failed to parse JSON response:", err.message);
+      console.error("Raw content preview (first 500 chars):", content.substring(0, 500));
+      
+      // Don't return the same content for all three - return error messages instead
+      throw new Error(`Failed to parse DeepSeek response as JSON: ${err.message}. The API may not have returned the expected format.`);
     }
   } catch (err) {
     console.error("❌ DeepSeek request failed!");
