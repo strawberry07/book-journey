@@ -39,9 +39,21 @@ const isToday = (date) => {
 };
 
 const fetchJson = async (url) => {
-  const res = await fetch(url);
-  if (!res.ok) throw new Error(`请求失败: ${res.status}`);
-  return res.json();
+  try {
+    const res = await fetch(url);
+    if (!res.ok) {
+      const errorText = await res.text();
+      console.error(`❌ Fetch failed: ${res.status} ${res.statusText}`, errorText);
+      throw new Error(`请求失败: ${res.status} ${res.statusText}`);
+    }
+    return res.json();
+  } catch (err) {
+    if (err.message.includes('Failed to fetch') || err.message.includes('NetworkError')) {
+      console.error('❌ Network error - possible CORS or connection issue:', err);
+      throw new Error('无法连接到服务器。请检查网络连接或稍后重试。');
+    }
+    throw err;
+  }
 };
 
 const loadBookForDate = async (date) => {
