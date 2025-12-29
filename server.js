@@ -124,15 +124,15 @@ const validateSummary = (summary) => {
     issues.push("部分版本内容相同");
   }
   
-  // 检查长度
-  if (summary.resonance.length < 200) {
-    issues.push("精华版过短（少于200字）");
+  // 检查长度（匹配提示词要求）
+  if (summary.resonance.length < 400) {
+    issues.push("精华版过短（少于400字）");
   }
-  if (summary.deep_dive.length < 800) {
-    issues.push("思考版过短（少于800字）");
+  if (summary.deep_dive.length < 1200) {
+    issues.push("思考版过短（少于1200字）");
   }
-  if (summary.masterclass.length < 1500) {
-    issues.push("沉浸版过短（少于1500字）");
+  if (summary.masterclass.length < 2000) {
+    issues.push("沉浸版过短（少于2000字）");
   }
   
   // 检查格式问题（过多的换行）
@@ -296,13 +296,15 @@ const buildPrompt = (book) => {
 - **重要：** 在内容开头，提供2-4句话的简洁总结，概括这本书的核心价值和为什么值得读（这段总结将用于分享卡片）
 - **关键要求（必须严格遵守）：** 
   * 开头的2-4句总结必须直接陈述书籍的核心观点，绝对不要使用任何元评论性表述
+  * **绝对禁止在总结中提及书名**（如"《盲眼钟表匠》"、"这本书"等），这不是推荐买书的app，重要的是书中的观点
   * 禁止使用："这本书告诉我们"、"作者认为"、"书中提到"、"这本书说"、"它告诉我们"、"这本书的核心是"等任何间接表述
+  * 禁止使用："如果你曾惊叹于..."、"那么《书名》将为你..."等推荐性表述
   * 直接说出观点本身，就像这些观点是客观事实一样
   * 示例对比：
+    - ❌ 错误："如果你曾惊叹于鹰眼的锐利，那么《盲眼钟表匠》将为你打开一扇全新的认知之窗。"
+    - ✅ 正确："生命的真正力量来自无目的、累积的自然选择，而非有意识的设计者。"
     - ❌ 错误："这本书告诉我们人是有需求的动物，除短暂的时间外，极少达到完全满足的状态。"
     - ✅ 正确："人是一种不断需求的动物，除短暂的时间外，极少达到完全满足的状态。"
-    - ❌ 错误："这本书揭示了生命的真正力量来自无目的、累积的自然选择。"
-    - ✅ 正确："生命的真正力量来自无目的、累积的自然选择，而非有意识的设计者。"
 
 **Version 2 (deep_dive - 10分钟思考):**
 - 必须详细梳理6-8个核心观点（不能少于6个），每个观点用一段话（至少6-8句话）深入阐述，包括：
@@ -1095,4 +1097,153 @@ process.on('unhandledRejection', (reason, promise) => {
   console.error('Unhandled Rejection at:', promise, 'reason:', reason);
   // Don't exit, let the server keep running
 });
+
+// 智能预生成函数：自动检查并生成未来缺失的内容
+const smartPreGenerate = async () => {
+  try {
+    const cache = await readCache();
+    const today = new Date();
+    const daysToCheck = 14; // 检查未来14天
+    let toGenerate = [];
+    
+    console.log('🔍 检查未来14天的内容生成状态...');
+    
+    // 找出需要生成的内容
+    for (let i = 1; i <= daysToCheck; i++) {
+      const futureDate = new Date(today);
+      futureDate.setDate(today.getDate() + i);
+      const dateStr = futureDate.toISOString().split("T")[0];
+      
+      try {
+        const book = await getBookForDate(dateStr);
+        
+        if (!cache[book.id] || cache[book.id].status !== "approved") {
+          toGenerate.push({ date: dateStr, bookId: book.id, book: book.title_cn });
+        }
+      } catch (err) {
+        console.error(`   ⚠️  检查日期 ${dateStr} 时出错:`, err.message);
+      }
+    }
+    
+    if (toGenerate.length > 0) {
+      console.log(`📚 发现 ${toGenerate.length} 个内容需要预生成`);
+      // 每次生成5个，避免一次性生成太多
+      const batchSize = 5;
+      let successCount = 0;
+      let skipCount = 0;
+      let errorCount = 0;
+      
+      for (let i = 0; i < toGenerate.length; i += batchSize) {
+        const batch = toGenerate.slice(i, i + batchSize);
+        const batchNum = Math.floor(i/batchSize) + 1;
+        const totalBatches = Math.ceil(toGenerate.length/batchSize);
+        console.log(`🔄 生成批次 ${batchNum}/${totalBatches} (${batch.length} 个内容)...`);
+        
+        for (const item of batch) {
+          try {
+            const book = books.find(b => b.id === item.bookId);
+            if (!book) {
+              console.error(`   ❌ ${item.date}: 书籍 ${item.bookId} 不存在`);
+              errorCount++;
+              continue;
+            }
+            
+            // 再次检查缓存（可能在生成过程中被其他进程更新）
+            const currentCache = await readCache();
+            if (currentCache[book.id] && currentCache[book.id].status === "approved") {
+              console.log(`   ⏭️  ${item.date}: ${item.book} 已存在，跳过`);
+              skipCount++;
+              continue;
+            }
+            
+            console.log(`   📚 ${item.date}: 生成 ${item.book}...`);
+            
+            const summary = await callDeepSeek(book);
+            const validation = validateSummary(summary);
+            
+            if (validation.valid) {
+              const summaryWithStatus = {
+                ...summary,
+                status: "approved",
+                validationIssues: [],
+                reviewedAt: Date.now(),
+                reviewedBy: "system",
+                createdAt: Date.now(),
+                source: "deepseek"
+              };
+              
+              const updatedCache = await readCache();
+              updatedCache[book.id] = summaryWithStatus;
+              await writeCache(updatedCache);
+              console.log(`   ✅ ${item.date}: ${item.book} 已生成并批准`);
+              successCount++;
+            } else {
+              console.error(`   ⚠️  ${item.date}: ${item.book} 质量检查未通过: ${validation.issues.join(", ")}`);
+              errorCount++;
+            }
+            
+            // 延迟避免限流
+            if (i + batch.length < toGenerate.length) {
+              await new Promise(resolve => setTimeout(resolve, 2000)); // 等待2秒
+            }
+          } catch (err) {
+            console.error(`   ❌ ${item.date}: ${item.book} 生成失败:`, err.message);
+            errorCount++;
+          }
+        }
+        
+        // 批次之间稍长延迟
+        if (i + batchSize < toGenerate.length) {
+          await new Promise(resolve => setTimeout(resolve, 3000)); // 等待3秒
+        }
+      }
+      
+      console.log(`\n📊 智能预生成完成:`);
+      console.log(`   ✅ 成功: ${successCount}`);
+      console.log(`   ⏭️  跳过: ${skipCount}`);
+      console.log(`   ❌ 失败: ${errorCount}`);
+    } else {
+      console.log('✅ 未来14天的内容已全部准备就绪');
+    }
+  } catch (err) {
+    console.error('❌ 智能预生成失败:', err);
+  }
+};
+
+// 服务器启动时延迟执行智能预生成（不阻塞启动）
+setTimeout(() => {
+  console.log('🚀 启动智能预生成检查...');
+  smartPreGenerate().catch(err => {
+    console.error('❌ 启动时智能预生成失败:', err);
+  });
+}, 5000); // 延迟5秒，确保服务器完全启动
+
+// 每天凌晨2点执行智能预生成（使用简单的定时器，不依赖外部库）
+const scheduleDailyPreGenerate = () => {
+  const now = new Date();
+  const tomorrow = new Date(now);
+  tomorrow.setDate(tomorrow.getDate() + 1);
+  tomorrow.setHours(2, 0, 0, 0); // 设置为明天凌晨2点
+  
+  const msUntilTomorrow = tomorrow.getTime() - now.getTime();
+  
+  setTimeout(() => {
+    console.log('🕐 定时任务：开始每日智能预生成...');
+    smartPreGenerate().catch(err => {
+      console.error('❌ 定时智能预生成失败:', err);
+    });
+    
+    // 设置每天重复执行
+    setInterval(() => {
+      console.log('🕐 定时任务：开始每日智能预生成...');
+      smartPreGenerate().catch(err => {
+        console.error('❌ 定时智能预生成失败:', err);
+      });
+    }, 24 * 60 * 60 * 1000); // 每24小时执行一次
+  }, msUntilTomorrow);
+  
+  console.log(`⏰ 已设置定时任务，将在 ${tomorrow.toLocaleString('zh-CN')} 执行首次预生成`);
+};
+
+scheduleDailyPreGenerate();
 

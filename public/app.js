@@ -237,13 +237,15 @@ const extractSummary = (summaryContent) => {
     return cleanMetaCommentary(fallback.trim() + (text.length > 200 ? '...' : ''));
   }
   
-  // Filter out sentences that contain meta-commentary patterns
-  // More aggressive: remove any sentence that mentions the book or author in meta-commentary way
+  // Filter out sentences that contain meta-commentary patterns or book title references
+  // More aggressive: remove any sentence that mentions the book, author, or book title
   const directSentences = sentences.filter(sentence => {
     const trimmed = sentence.trim();
     // Skip sentences that contain meta-commentary patterns anywhere (not just at start)
     const hasMetaCommentary = /(这本书|书中|作者|它|本书)(告诉|说|提到|认为|指出|强调|探讨|揭示|阐述|展示|帮助|让|启发|提醒|的核心|的核心是|的核心在于|的核心价值|的核心价值是|的核心价值在于|的核心观点|的核心观点是|的核心观点在于|的核心思想|的核心思想是|的核心思想在于|探讨|揭示|阐述|展示)/.test(trimmed);
-    return !hasMetaCommentary;
+    // Skip sentences that mention book titles (e.g., "《盲眼钟表匠》" or "那么《书名》将为你...")
+    const hasBookTitle = /《[^》]+》|如果你曾|那么.*将为你|为你打开|为你提供|为你带来/.test(trimmed);
+    return !hasMetaCommentary && !hasBookTitle;
   });
   
   // If we filtered out all sentences, try to clean the original sentences instead
@@ -337,11 +339,20 @@ const cleanMetaCommentary = (text) => {
   // Remove any remaining patterns that might have been missed
   cleaned = cleaned.replace(/(这本书|书中|作者|它|本书)(告诉|说|提到|认为|指出|强调|探讨|揭示|阐述|展示|帮助|让|启发|提醒)/g, '');
   
-  // Remove any sentence that starts with meta-commentary (even after cleaning)
+  // Remove book title references (e.g., "《盲眼钟表匠》" or "那么《书名》将为你...")
+  cleaned = cleaned.replace(/《[^》]+》/g, ''); // Remove book titles in 《》
+  cleaned = cleaned.replace(/如果你曾[^。！？]*那么[^。！？]*[。！？]/g, ''); // Remove "如果你曾...那么..." patterns
+  cleaned = cleaned.replace(/那么[^。！？]*将为你[^。！？]*[。！？]/g, ''); // Remove "那么...将为你..." patterns
+  cleaned = cleaned.replace(/为你打开[^。！？]*[。！？]/g, ''); // Remove "为你打开..." patterns
+  cleaned = cleaned.replace(/为你提供[^。！？]*[。！？]/g, ''); // Remove "为你提供..." patterns
+  cleaned = cleaned.replace(/为你带来[^。！？]*[。！？]/g, ''); // Remove "为你带来..." patterns
+  
+  // Remove any sentence that starts with meta-commentary or book references (even after cleaning)
   const sentences = cleaned.split(/[。！？]/);
   const directSentences = sentences.filter(s => {
     const trimmed = s.trim();
-    return !trimmed.match(/^(这本书|书中|作者|它|本书)/);
+    return !trimmed.match(/^(这本书|书中|作者|它|本书|如果你曾|那么)/) && 
+           !trimmed.match(/《[^》]+》/); // Also filter out sentences with book titles
   });
   
   if (directSentences.length > 0) {
