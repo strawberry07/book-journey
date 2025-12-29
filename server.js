@@ -146,12 +146,22 @@ const validateSummary = (summary) => {
     issues.push("精华版格式异常（换行过多）");
   }
   
-  // 检查是否包含明显的错误标记
+  // 检查是否包含明显的错误标记（更精确的检查，避免误判）
   const hasErrorMarkers = (text) => {
-    return text.includes("生成摘要时出错") || 
-           text.includes("Failed to") ||
-           text.includes("Error:") ||
-           text.includes("错误");
+    // 只检查特定的错误模式，而不是简单的"错误"这个词
+    const errorPatterns = [
+      /生成摘要时出错/i,
+      /Failed to generate/i,
+      /Error:.*生成/i,
+      /生成.*失败/i,
+      /无法生成摘要/i,
+      /请检查服务器日志/i,
+      /未知错误/i,
+      /API.*error/i,
+      /DeepSeek.*error/i
+    ];
+    
+    return errorPatterns.some(pattern => pattern.test(text));
   };
   
   if (hasErrorMarkers(summary.resonance) || 
@@ -496,61 +506,74 @@ const ensureSummary = async (bookId) => {
   const book = books.find((b) => b.id === bookId);
   if (!book) throw new Error("Book not found");
   
-  try {
-    const summary = await callDeepSeek(book);
-    
-    // 自动质量检查
-    const validation = validateSummary(summary);
-    
-    // 如果验证失败，不保存到缓存，直接抛出错误触发重新生成
-    if (!validation.valid) {
-      console.warn(`⚠️  Book ${bookId} summary failed validation:`, validation.issues);
-      throw new Error(`内容质量检查未通过: ${validation.issues.join(", ")}`);
+  // 重试机制：最多重试3次
+  let retryCount = 0;
+  const maxRetries = 3;
+  
+  while (retryCount < maxRetries) {
+    try {
+      const summary = await callDeepSeek(book);
+      
+      // 自动质量检查
+      const validation = validateSummary(summary);
+      
+      // 如果验证失败，重试（除非是最后一次尝试）
+      if (!validation.valid) {
+        retryCount++;
+        if (retryCount < maxRetries) {
+          console.warn(`⚠️  Book ${bookId} summary failed validation (attempt ${retryCount}/${maxRetries}):`, validation.issues);
+          console.warn(`   重试生成...`);
+          // 等待2秒后重试
+          await new Promise(resolve => setTimeout(resolve, 2000));
+          continue;
+        } else {
+          console.error(`❌ Book ${bookId} summary failed validation after ${maxRetries} attempts:`, validation.issues);
+          throw new Error(`内容质量检查未通过: ${validation.issues.join(", ")}`);
+        }
+      }
+      
+      // 验证通过，保存并返回
+      const summaryWithStatus = {
+        ...summary,
+        status: "approved",  // 直接设置为 approved
+        validationIssues: [],  // 验证通过，没有问题
+        reviewedAt: Date.now(),
+        reviewedBy: "system",  // 标记为系统自动审核
+        createdAt: summary.createdAt || Date.now(),
+        source: summary.source || "deepseek"
+      };
+      
+      cache[bookId] = summaryWithStatus;
+      await writeCache(cache);
+      
+      console.log(`✅ Book ${bookId} summary auto-approved by system (attempt ${retryCount + 1})`);
+      
+      // 直接返回内容
+      return {
+        resonance: summaryWithStatus.resonance,
+        deep_dive: summaryWithStatus.deep_dive,
+        masterclass: summaryWithStatus.masterclass,
+        createdAt: summaryWithStatus.createdAt,
+        source: summaryWithStatus.source
+      };
+      
+    } catch (err) {
+      // 如果是验证失败且还有重试机会，继续循环
+      if (err.message.includes("质量检查") && retryCount < maxRetries - 1) {
+        retryCount++;
+        console.warn(`⚠️  Book ${bookId} generation failed (attempt ${retryCount}/${maxRetries}):`, err.message);
+        console.warn(`   重试生成...`);
+        await new Promise(resolve => setTimeout(resolve, 2000));
+        continue;
+      }
+      
+      // 其他错误或已达到最大重试次数，抛出错误
+      throw err;
     }
-    
-    // 验证通过，直接批准并保存
-    const summaryWithStatus = {
-      ...summary,
-      status: "approved",  // 直接设置为 approved
-      validationIssues: [],  // 验证通过，没有问题
-      reviewedAt: Date.now(),
-      reviewedBy: "system",  // 标记为系统自动审核
-      createdAt: summary.createdAt || Date.now(),
-      source: summary.source || "deepseek"
-    };
-    
-    cache[bookId] = summaryWithStatus;
-    await writeCache(cache);
-    
-    console.log(`✅ Book ${bookId} summary auto-approved by system`);
-    
-    // 直接返回内容
-    return {
-      resonance: summaryWithStatus.resonance,
-      deep_dive: summaryWithStatus.deep_dive,
-      masterclass: summaryWithStatus.masterclass,
-      createdAt: summaryWithStatus.createdAt,
-      source: summaryWithStatus.source
-    };
-    
-  } catch (err) {
-    // 如果是验证失败，重新生成（会递归调用，但应该避免无限循环）
-    if (err.message.includes("质量检查")) {
-      throw err;  // 会触发重新生成
-    }
-    
-    // 其他错误，返回错误摘要
-    console.error(`❌ Failed to generate summary for book ${bookId}:`, err.message);
-    console.error(`   Full error:`, err);
-    const errorMsg = err.message || "未知错误";
-    return {
-      resonance: `生成摘要时出错: ${errorMsg}。请检查服务器日志获取详细信息。`,
-      deep_dive: `生成摘要时出错: ${errorMsg}。请检查服务器日志获取详细信息。`,
-      masterclass: `生成摘要时出错: ${errorMsg}。请检查服务器日志获取详细信息。`,
-      createdAt: Date.now(),
-      source: "error",
-    };
   }
+  
+  // 如果循环结束但还没有返回，说明所有重试都失败了
+  throw new Error(`内容生成失败：已重试 ${maxRetries} 次但仍未通过验证`);
 };
 
 const sendJson = (res, status, data) => {
