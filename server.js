@@ -379,8 +379,8 @@ const server = http.createServer((req, res) => {
   requestListener(req, res);
 });
 
-server.listen(PORT, () => {
-  console.log(`Book Journey server running at http://localhost:${PORT}`);
+server.listen(PORT, '0.0.0.0', () => {
+  console.log(`Book Journey server running at http://0.0.0.0:${PORT}`);
   if (!DEEPSEEK_API_KEY) {
     console.warn("⚠️  WARNING: DEEPSEEK_API_KEY is not set!");
     console.warn("   Set it with: export DEEPSEEK_API_KEY='your-key'");
