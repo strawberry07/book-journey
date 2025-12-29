@@ -320,6 +320,11 @@ const requestListener = async (req, res) => {
   const urlObj = new URL(req.url, `http://${req.headers.host || 'localhost'}`);
   console.log(`📨 ${req.method} ${urlObj.pathname}`);
 
+  // Health check endpoint for Railway/deployment platforms
+  if (req.method === "GET" && urlObj.pathname === "/health") {
+    return sendJson(res, 200, { status: "ok", service: "book-journey" });
+  }
+
   if (req.method === "GET" && urlObj.pathname === "/api/book/today") {
     try {
       const book = await getTodaysBook();
