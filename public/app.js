@@ -202,41 +202,69 @@ nextDayBtn.addEventListener("click", () => {
 const extractSummary = (summaryContent) => {
   if (!summaryContent) return null;
   
-  // Remove HTML tags to get plain text
+  // Remove HTML tags and normalize text
   let text = summaryContent
     .replace(/<[^>]+>/g, ' ') // Replace HTML tags with spaces
     .replace(/&nbsp;/g, ' ')
+    .replace(/\\n/g, ' ') // Handle escaped newlines
+    .replace(/\n/g, ' ') // Handle actual newlines
     .replace(/\s+/g, ' ') // Normalize whitespace
     .trim();
+  
+  if (!text || text.length === 0) return null;
   
   // Extract first 2-4 sentences (ending with 。！？)
   const sentencePattern = /[^。！？]*[。！？]/g;
   const sentences = text.match(sentencePattern);
   
   if (!sentences || sentences.length === 0) {
-    // Fallback: extract first 100-200 characters
-    return text.substring(0, 200).trim() + (text.length > 200 ? '...' : '');
+    // Fallback: extract first 150-200 characters (try to end at a natural break)
+    const fallback = text.substring(0, 200);
+    const lastPeriod = fallback.lastIndexOf('。');
+    const lastExclamation = fallback.lastIndexOf('！');
+    const lastQuestion = fallback.lastIndexOf('？');
+    const lastPunct = Math.max(lastPeriod, lastExclamation, lastQuestion);
+    
+    if (lastPunct > 50) {
+      return fallback.substring(0, lastPunct + 1);
+    }
+    return fallback.trim() + (text.length > 200 ? '...' : '');
   }
   
   // Take 2-4 sentences (prefer 3-4, but at least 2)
   const count = Math.min(Math.max(2, sentences.length), 4);
-  const summary = sentences.slice(0, count).join(' ').trim();
+  const summary = sentences.slice(0, count).join('').trim();
   
   return summary || null;
 };
 
 const getSummaryFromContent = async () => {
-  // Try to get summary from currently loaded summary
-  if (summaryEl.innerHTML) {
-    const summary = extractSummary(summaryEl.innerHTML);
-    if (summary) return summary;
-  }
-  
-  // If not loaded, fetch the resonance summary to get the summary
+  // Always fetch the resonance summary to get clean text (not HTML)
+  // This ensures we get the original text before HTML processing
   try {
+    if (!currentBook || !currentBook.id) {
+      console.error("No current book available");
+      return null;
+    }
+    
     const data = await fetchJson(`/api/book/${currentBook.id}/summary`);
     const resonanceContent = data.summary?.resonance || '';
-    return extractSummary(resonanceContent);
+    
+    if (!resonanceContent) {
+      console.error("No resonance content available");
+      return null;
+    }
+    
+    const summary = extractSummary(resonanceContent);
+    
+    if (!summary) {
+      console.warn("Failed to extract summary from content");
+      // Fallback: return first 200 characters
+      const text = resonanceContent.replace(/<[^>]+>/g, ' ').replace(/\s+/g, ' ').trim();
+      return text.substring(0, 200) + (text.length > 200 ? '...' : '');
+    }
+    
+    return summary;
   } catch (err) {
     console.error("Failed to fetch summary:", err);
     return null;
@@ -601,8 +629,8 @@ const shareContent = async () => {
 
   statusEl.textContent = "正在生成分享卡片...";
   
-  // Get the quote
-  const quote = await getQuoteFromSummary();
+  // Get the summary (2-4 sentences)
+  const summary = await getSummaryFromContent();
   
   // Prepare share card content
   const shareCard = document.getElementById("share-card");
