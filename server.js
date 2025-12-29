@@ -385,23 +385,91 @@ const requestListener = async (req, res) => {
     return;
   }
 
+  // List cache endpoint
+  if (req.method === "GET" && urlObj.pathname === "/api/admin/cache") {
+    try {
+      const cache = await readCache();
+      const cachedIds = Object.keys(cache).map(Number).sort((a, b) => a - b);
+      
+      // Check for problematic entries
+      const problematic = [];
+      for (const bookId of cachedIds) {
+        const entry = cache[bookId];
+        if (!entry) continue;
+        
+        const { resonance, deep_dive, masterclass } = entry;
+        if (!resonance || !deep_dive || !masterclass) {
+          problematic.push({ id: bookId, reason: "Missing versions" });
+        } else if (resonance === deep_dive || resonance === masterclass || deep_dive === masterclass) {
+          problematic.push({ id: bookId, reason: "Identical versions" });
+        }
+      }
+      
+      return sendJson(res, 200, {
+        total: cachedIds.length,
+        cachedIds,
+        problematic: problematic.length,
+        problematicIds: problematic.map(p => p.id),
+        details: problematic
+      });
+    } catch (err) {
+      console.error("Error listing cache:", err);
+      return sendJson(res, 500, { error: "Failed to list cache" });
+    }
+  }
+
   // Clear cache endpoint (for admin use)
   if (req.method === "POST" && urlObj.pathname === "/api/admin/clear-cache") {
     try {
       const cache = await readCache();
-      const cacheSize = Object.keys(cache).length;
-      
-      // Clear the cache
-      await writeCache({});
-      
-      console.log(`🗑️  Cache cleared: ${cacheSize} entries removed`);
-      return sendJson(res, 200, { 
-        success: true, 
-        message: `Cache cleared successfully. Removed ${cacheSize} cached summaries.` 
+      const body = await new Promise((resolve, reject) => {
+        let data = "";
+        req.on("data", chunk => { data += chunk; });
+        req.on("end", () => {
+          try {
+            resolve(data ? JSON.parse(data) : {});
+          } catch (e) {
+            reject(e);
+          }
+        });
+        req.on("error", reject);
       });
+      
+      const bookIds = body.bookIds; // Array of book IDs to clear, or null/undefined to clear all
+      
+      if (bookIds === null || bookIds === undefined || (Array.isArray(bookIds) && bookIds.length === 0)) {
+        // Clear all
+        const cacheSize = Object.keys(cache).length;
+        await writeCache({});
+        console.log(`🗑️  Cache cleared: ${cacheSize} entries removed`);
+        return sendJson(res, 200, { 
+          success: true, 
+          message: `Cache cleared successfully. Removed ${cacheSize} cached summaries.`,
+          cleared: cacheSize
+        });
+      } else if (Array.isArray(bookIds)) {
+        // Clear specific books
+        let clearedCount = 0;
+        for (const bookId of bookIds) {
+          if (cache[bookId]) {
+            delete cache[bookId];
+            clearedCount++;
+          }
+        }
+        await writeCache(cache);
+        console.log(`🗑️  Cache cleared for ${clearedCount} book(s): ${bookIds.join(", ")}`);
+        return sendJson(res, 200, {
+          success: true,
+          message: `Cleared cache for ${clearedCount} book(s)`,
+          cleared: clearedCount,
+          bookIds: bookIds
+        });
+      } else {
+        return sendJson(res, 400, { error: "Invalid request. Expected { bookIds: [1, 2, 3] } or { bookIds: null } to clear all" });
+      }
     } catch (err) {
       console.error("Error clearing cache:", err);
-      return sendJson(res, 500, { error: "Failed to clear cache" });
+      return sendJson(res, 500, { error: "Failed to clear cache", details: err.message });
     }
   }
 
