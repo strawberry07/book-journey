@@ -37,9 +37,36 @@
     .book-title { font-size: 18px; font-weight: bold; color: #333; }
     .book-meta { color: #666; font-size: 14px; margin-top: 5px; }
     .summary-preview {
-      background: #f9f9f9; padding: 15px; border-radius: 4px;
-      margin: 10px 0; max-height: 200px; overflow-y: auto;
+      margin: 10px 0;
       font-size: 14px; line-height: 1.8;
+    }
+    .summary-preview details {
+      margin-bottom: 10px;
+    }
+    .summary-preview details summary {
+      cursor: pointer;
+      font-weight: bold;
+      color: #333;
+      padding: 8px;
+      background: #f0f0f0;
+      border-radius: 4px;
+      user-select: none;
+    }
+    .summary-preview details summary:hover {
+      background: #e0e0e0;
+    }
+    .summary-preview details[open] summary {
+      border-bottom-left-radius: 0;
+      border-bottom-right-radius: 0;
+    }
+    .summary-preview details > div {
+      padding: 15px;
+      background: #f9f9f9;
+      border-radius: 0 0 4px 4px;
+      max-height: 300px;
+      overflow-y: auto;
+      white-space: pre-wrap;
+      word-wrap: break-word;
     }
     .issues {
       background: #fff3cd; padding: 10px; border-radius: 4px;
@@ -101,6 +128,7 @@
     <div style="margin-bottom: 20px;">
       <button class="btn-batch" onclick="approveAll()">✅ 批准全部</button>
       <button class="refresh-btn" onclick="fetchPending()">🔄 刷新</button>
+      <button class="refresh-btn" onclick="checkTodayBook()" style="margin-left: 10px;">🔍 检查今天的书籍</button>
     </div>
     
     <div style="background: white; border-radius: 8px; padding: 20px; margin-bottom: 20px; box-shadow: 0 2px 4px rgba(0,0,0,0.1);">
@@ -146,15 +174,33 @@
       try {
         const res = await fetch('/api/admin/pending');
         if (!res.ok) {
-          throw new Error(`HTTP ${res.status}: ${res.statusText}`);
+          const errorText = await res.text();
+          throw new Error(`HTTP ${res.status}: ${res.statusText} - ${errorText}`);
         }
         const data = await res.json();
         pendingData = data.pending || [];
+        
+        // 添加调试信息
+        console.log('📋 待审核内容:', pendingData);
+        console.log('📊 数量:', pendingData.length);
+        if (pendingData.length > 0) {
+          console.log('📚 书籍 ID:', pendingData.map(p => p.bookId));
+          console.log('📝 状态:', pendingData.map(p => p.currentStatus));
+        }
+        
         renderPending();
         updateStats();
       } catch (err) {
+        console.error('❌ 获取待审核列表失败:', err);
         container.innerHTML = 
-          `<div class="empty">❌ 加载失败: ${err.message}<br>请检查服务器是否正常运行</div>`;
+          `<div class="empty">
+            ❌ 加载失败: ${err.message}<br>
+            请检查服务器是否正常运行<br><br>
+            <details style="text-align: left; margin-top: 10px;">
+              <summary style="cursor: pointer; color: #666;">查看错误详情</summary>
+              <pre style="background: #f5f5f5; padding: 10px; border-radius: 4px; margin-top: 10px; font-size: 12px; overflow-x: auto;">${err.stack || err.message}</pre>
+            </details>
+          </div>`;
       }
     }
     
@@ -183,6 +229,12 @@
             </div>
           </div>
           
+          ${item.needsMigration ? `
+            <div class="issues" style="background: #e7f3ff; border-left: 3px solid #2f6feb;">
+              ℹ️ 旧格式内容（需要迁移到新格式）
+            </div>
+          ` : ''}
+          
           ${item.validationIssues && item.validationIssues.length > 0 ? `
             <div class="issues">
               ⚠️ 质量问题:
@@ -192,9 +244,39 @@
             </div>
           ` : ''}
           
+          ${item.currentStatus ? `
+            <div style="font-size: 12px; color: #666; margin-top: 5px;">
+              状态: <strong>${item.currentStatus === 'legacy' ? '旧格式' : item.currentStatus}</strong>
+            </div>
+          ` : ''}
+          
           <div class="summary-preview">
-            <strong>精华版预览:</strong><br>
-            ${item.summary.resonance || '无'}
+            <details style="margin-bottom: 10px;">
+              <summary style="cursor: pointer; font-weight: bold; color: #333; margin-bottom: 5px;">
+                3 分钟 · 精华版预览
+              </summary>
+              <div style="padding: 10px; background: #f9f9f9; border-radius: 4px; margin-top: 5px;">
+                ${item.summary.resonance || '无'}
+              </div>
+            </details>
+            
+            <details style="margin-bottom: 10px;">
+              <summary style="cursor: pointer; font-weight: bold; color: #333; margin-bottom: 5px;">
+                10 分钟 · 思考版预览
+              </summary>
+              <div style="padding: 10px; background: #f9f9f9; border-radius: 4px; margin-top: 5px;">
+                ${item.summary.deep_dive || '无'}
+              </div>
+            </details>
+            
+            <details style="margin-bottom: 10px;">
+              <summary style="cursor: pointer; font-weight: bold; color: #333; margin-bottom: 5px;">
+                30 分钟 · 沉浸版预览
+              </summary>
+              <div style="padding: 10px; background: #f9f9f9; border-radius: 4px; margin-top: 5px;">
+                ${item.summary.masterclass || '无'}
+              </div>
+            </details>
           </div>
           
           <div class="actions">
@@ -375,6 +457,59 @@
         log.innerHTML += `❌ 错误: ${err.message}<br>`;
         btn.disabled = false;
         btn.textContent = '🚀 开始预生成';
+      }
+    }
+    
+    async function checkTodayBook() {
+      try {
+        // 获取今天的书籍
+        const todayRes = await fetch('/api/book/today');
+        const todayData = await todayRes.json();
+        const bookId = todayData.book.id;
+        
+        console.log('今天的书籍:', todayData.book);
+        
+        // 检查该书籍的缓存状态
+        const checkRes = await fetch(`/api/admin/check-book?id=${bookId}`);
+        const checkData = await checkRes.json();
+        
+        console.log('书籍状态:', checkData);
+        
+        const statusMsg = `
+书籍: ${checkData.book ? `《${checkData.book.title_cn}》` : `ID ${bookId}`}
+书籍 ID: ${bookId}
+
+缓存状态:
+- 已缓存: ${checkData.cached ? '✅ 是' : '❌ 否'}
+- 状态: ${checkData.status}
+- 需要迁移: ${checkData.needsMigration ? '⚠️ 是（旧格式）' : '✅ 否'}
+
+内容完整性:
+- 精华版: ${checkData.hasResonance ? '✅' : '❌'} (${checkData.resonanceLength} 字)
+- 思考版: ${checkData.hasDeepDive ? '✅' : '❌'} (${checkData.deepDiveLength} 字)
+- 沉浸版: ${checkData.hasMasterclass ? '✅' : '❌'} (${checkData.masterclassLength} 字)
+
+时间信息:
+- 创建时间: ${checkData.createdAt ? new Date(checkData.createdAt).toLocaleString('zh-CN') : '无'}
+- 审核时间: ${checkData.reviewedAt ? new Date(checkData.reviewedAt).toLocaleString('zh-CN') : '无'}
+
+质量问题: ${checkData.validationIssues.length > 0 ? checkData.validationIssues.join(', ') : '无'}
+        `.trim();
+        
+        alert(statusMsg);
+        
+        // 如果不在待审核列表中，提示
+        if (checkData.status === 'approved') {
+          alert('✅ 该书籍已批准，不会显示在待审核列表中。');
+        } else if (checkData.status === 'not_found') {
+          alert('❌ 该书籍没有缓存，需要生成。');
+        } else if (checkData.status === 'legacy') {
+          alert('ℹ️ 该书籍是旧格式，批准时会自动迁移到新格式。');
+        }
+        
+      } catch (err) {
+        console.error('检查失败:', err);
+        alert(`❌ 检查失败: ${err.message}`);
       }
     }
     

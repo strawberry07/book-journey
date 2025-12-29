@@ -8,6 +8,7 @@
     "start": "node server.js",
     "dev": "NODE_ENV=development node server.js",
     "test": "node test.js",
+    "test-admin": "node test-admin-features.js",
     "clear-cache": "node clear-cache.js"
   },
   "engines": {

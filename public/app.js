@@ -41,6 +41,7 @@ const isToday = (date) => {
 const fetchJson = async (url) => {
   try {
     const res = await fetch(url);
+    
     if (!res.ok) {
       const errorText = await res.text();
       console.error(`❌ Fetch failed: ${res.status} ${res.statusText}`, errorText);
@@ -213,9 +214,14 @@ const extractSummary = (summaryContent) => {
   
   if (!text || text.length === 0) return null;
   
-  // Extract first 2-4 sentences (ending with 。！？)
+  // Debug: log original text
+  console.log('📝 Original text (first 200 chars):', text.substring(0, 200));
+  
+  // Split into sentences first
   const sentencePattern = /[^。！？]*[。！？]/g;
-  const sentences = text.match(sentencePattern);
+  let sentences = text.match(sentencePattern);
+  
+  console.log('📊 Found sentences:', sentences?.length || 0);
   
   if (!sentences || sentences.length === 0) {
     // Fallback: extract first 150-200 characters (try to end at a natural break)
@@ -226,16 +232,123 @@ const extractSummary = (summaryContent) => {
     const lastPunct = Math.max(lastPeriod, lastExclamation, lastQuestion);
     
     if (lastPunct > 50) {
-      return fallback.substring(0, lastPunct + 1);
+      return cleanMetaCommentary(fallback.substring(0, lastPunct + 1));
     }
-    return fallback.trim() + (text.length > 200 ? '...' : '');
+    return cleanMetaCommentary(fallback.trim() + (text.length > 200 ? '...' : ''));
+  }
+  
+  // Filter out sentences that contain meta-commentary patterns
+  // More aggressive: remove any sentence that mentions the book or author in meta-commentary way
+  const directSentences = sentences.filter(sentence => {
+    const trimmed = sentence.trim();
+    // Skip sentences that contain meta-commentary patterns anywhere (not just at start)
+    const hasMetaCommentary = /(这本书|书中|作者|它|本书)(告诉|说|提到|认为|指出|强调|探讨|揭示|阐述|展示|帮助|让|启发|提醒|的核心|的核心是|的核心在于|的核心价值|的核心价值是|的核心价值在于|的核心观点|的核心观点是|的核心观点在于|的核心思想|的核心思想是|的核心思想在于|探讨|揭示|阐述|展示)/.test(trimmed);
+    return !hasMetaCommentary;
+  });
+  
+  // If we filtered out all sentences, try to clean the original sentences instead
+  let sentencesToUse;
+  if (directSentences.length === 0) {
+    // Clean the original sentences by removing meta-commentary phrases
+    sentencesToUse = sentences.map(sentence => cleanMetaCommentary(sentence)).filter(s => s.length > 0);
+  } else {
+    sentencesToUse = directSentences;
+  }
+  
+  // If still no sentences, use original but cleaned
+  if (sentencesToUse.length === 0) {
+    sentencesToUse = sentences.map(sentence => cleanMetaCommentary(sentence)).filter(s => s.length > 0);
   }
   
   // Take 2-4 sentences (prefer 3-4, but at least 2)
-  const count = Math.min(Math.max(2, sentences.length), 4);
-  const summary = sentences.slice(0, count).join('').trim();
+  const count = Math.min(Math.max(2, sentencesToUse.length), 4);
+  let summary = sentencesToUse.slice(0, count).join('').trim();
+  
+  console.log('📋 Summary before final cleanup:', summary.substring(0, 200));
+  
+  // Final cleanup: remove any remaining meta-commentary
+  summary = cleanMetaCommentary(summary);
+  
+  console.log('✅ Final summary:', summary.substring(0, 200));
   
   return summary || null;
+};
+
+// Helper function to clean meta-commentary from text
+const cleanMetaCommentary = (text) => {
+  if (!text) return text;
+  
+  // Remove meta-commentary phrases anywhere in the text (not just at start)
+  const patterns = [
+    // 这本书...
+    /这本书告诉我们[，,：:]\s*/g,
+    /这本书说[，,：:]\s*/g,
+    /这本书的核心是[，,：:]\s*/g,
+    /这本书的核心在于[，,：:]\s*/g,
+    /这本书的核心价值是[，,：:]\s*/g,
+    /这本书的核心价值在于[，,：:]\s*/g,
+    /这本书探讨了[，,：:]\s*/g,
+    /这本书揭示了[，,：:]\s*/g,
+    /这本书阐述了[，,：:]\s*/g,
+    /这本书展示了[，,：:]\s*/g,
+    /这本书帮助我们[，,：:]\s*/g,
+    /这本书让我们[，,：:]\s*/g,
+    /这本书启发我们[，,：:]\s*/g,
+    /这本书提醒我们[，,：:]\s*/g,
+    /这本书的核心观点是[，,：:]\s*/g,
+    /这本书的核心观点在于[，,：:]\s*/g,
+    /这本书的核心思想是[，,：:]\s*/g,
+    /这本书的核心思想在于[，,：:]\s*/g,
+    // 书中...
+    /书中提到[，,：:]\s*/g,
+    /书中说[，,：:]\s*/g,
+    /书中指出[，,：:]\s*/g,
+    /书中强调[，,：:]\s*/g,
+    // 作者...
+    /作者认为[，,：:]\s*/g,
+    /作者指出[，,：:]\s*/g,
+    /作者强调[，,：:]\s*/g,
+    /作者说[，,：:]\s*/g,
+    /作者提到[，,：:]\s*/g,
+    // 它...
+    /它告诉我们[，,：:]\s*/g,
+    /它说[，,：:]\s*/g,
+    /它探讨了[，,：:]\s*/g,
+    /它揭示了[，,：:]\s*/g,
+    /它阐述了[，,：:]\s*/g,
+    /它展示了[，,：:]\s*/g,
+    // 本书...
+    /本书告诉我们[，,：:]\s*/g,
+    /本书说[，,：:]\s*/g,
+    /本书的核心是[，,：:]\s*/g,
+    /本书的核心在于[，,：:]\s*/g,
+    // 更通用的模式
+    /(这本书|书中|作者|它|本书)(的核心|的核心是|的核心在于|的核心价值|的核心价值是|的核心价值在于|的核心观点|的核心观点是|的核心观点在于|的核心思想|的核心思想是|的核心思想在于)[，,：:]\s*/g,
+  ];
+  
+  let cleaned = text;
+  patterns.forEach(pattern => {
+    cleaned = cleaned.replace(pattern, '');
+  });
+  
+  // Also remove standalone meta-commentary phrases (more aggressive)
+  cleaned = cleaned.replace(/\s*(这本书|书中|作者|它|本书)(告诉|说|提到|认为|指出|强调|探讨|揭示|阐述|展示|帮助|让|启发|提醒|的核心|的核心是|的核心在于|的核心价值|的核心价值是|的核心价值在于|的核心观点|的核心观点是|的核心观点在于|的核心思想|的核心思想是|的核心思想在于)[，,：:]\s*/g, '');
+  
+  // Remove any remaining patterns that might have been missed
+  cleaned = cleaned.replace(/(这本书|书中|作者|它|本书)(告诉|说|提到|认为|指出|强调|探讨|揭示|阐述|展示|帮助|让|启发|提醒)/g, '');
+  
+  // Remove any sentence that starts with meta-commentary (even after cleaning)
+  const sentences = cleaned.split(/[。！？]/);
+  const directSentences = sentences.filter(s => {
+    const trimmed = s.trim();
+    return !trimmed.match(/^(这本书|书中|作者|它|本书)/);
+  });
+  
+  if (directSentences.length > 0) {
+    cleaned = directSentences.join('。').trim();
+  }
+  
+  return cleaned.trim();
 };
 
 const getSummaryFromContent = async () => {
@@ -257,11 +370,15 @@ const getSummaryFromContent = async () => {
     
     const summary = extractSummary(resonanceContent);
     
+    // Debug: log the extracted summary
+    console.log('📋 Extracted summary for share card:', summary);
+    
     if (!summary) {
       console.warn("Failed to extract summary from content");
-      // Fallback: return first 200 characters
+      // Fallback: return first 200 characters (also clean it)
       const text = resonanceContent.replace(/<[^>]+>/g, ' ').replace(/\s+/g, ' ').trim();
-      return text.substring(0, 200) + (text.length > 200 ? '...' : '');
+      const cleaned = cleanMetaCommentary(text.substring(0, 200));
+      return cleaned + (text.length > 200 ? '...' : '');
     }
     
     return summary;

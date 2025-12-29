@@ -193,16 +193,16 @@ const preGenerateSummaries = async (count = 10) => {
         continue;
       }
 
-      // 检查是否已存在但待审核
-      if (cache[book.id] && cache[book.id].status === "pending") {
-        console.log(`⏳ [${i + 1}/${count}] ${dateStr}: 书籍 ${book.id}《${book.title_cn}》待审核，跳过`);
-        results.skipped.push({ date: dateStr, bookId: book.id, book: book.title_cn, reason: "待审核" });
-        continue;
+      // 如果存在但不是 approved，删除并重新生成
+      if (cache[book.id] && cache[book.id].status !== "approved") {
+        console.log(`🔄 [${i + 1}/${count}] ${dateStr}: 书籍 ${book.id}《${book.title_cn}》状态为 ${cache[book.id].status}，重新生成`);
+        delete cache[book.id];
+        await writeCache(cache);
       }
 
       console.log(`📚 [${i + 1}/${count}] ${dateStr}: 生成书籍 ${book.id}《${book.title_cn}》...`);
 
-      // 直接调用 callDeepSeek 生成摘要，然后手动设置状态
+      // 直接调用 callDeepSeek 生成摘要，然后自动批准
       try {
         const summary = await callDeepSeek(book);
         
@@ -212,10 +212,10 @@ const preGenerateSummaries = async (count = 10) => {
         // 设置审核状态
         const summaryWithStatus = {
           ...summary,
-          status: validation.valid ? "pending" : "rejected",
+          status: validation.valid ? "approved" : "rejected",  // 直接 approved，不再 pending
           validationIssues: validation.issues,
-          reviewedAt: null,
-          reviewedBy: null,
+          reviewedAt: validation.valid ? Date.now() : null,
+          reviewedBy: validation.valid ? "system" : null,  // 系统自动审核
           createdAt: summary.createdAt || Date.now(),
           source: summary.source || "deepseek"
         };
@@ -226,8 +226,8 @@ const preGenerateSummaries = async (count = 10) => {
         await writeCache(updatedCache);
         
         const status = summaryWithStatus.status;
-        if (status === "pending") {
-          console.log(`   ✅ 生成成功，等待审核`);
+        if (status === "approved") {
+          console.log(`   ✅ 生成成功，已自动批准`);
         } else {
           console.log(`   ⚠️  生成成功但质量检查未通过: ${validation.issues.join(", ")}`);
         }
@@ -260,7 +260,22 @@ const buildPrompt = (book) => {
 你是一位博学的朋友和思考伙伴，用温暖、真诚、易懂的语言分享书籍的智慧。请为《${book.title_cn}》（${book.title_en}）作者：${book.author} 提供三版摘要。
 
 ### 语言风格
-使用自然、流畅的简体中文，像朋友聊天一样亲切。避免学术腔调和AI感，用真实、有温度的语言。不要说"这本书告诉我们"、"作者认为"这类套话，直接分享核心观点。
+使用自然、流畅的简体中文，像朋友聊天一样亲切。避免学术腔调和AI感，用真实、有温度的语言。
+
+**严格禁止使用以下表述：**
+- ❌ "这本书告诉我们..."
+- ❌ "这本书说..."
+- ❌ "书中提到..."
+- ❌ "作者认为..."
+- ❌ "作者指出..."
+- ❌ "这本书的核心是..."
+- ❌ "这本书揭示了..."
+- ❌ "它告诉我们..."
+- ❌ 任何类似的元评论性表述
+
+**必须直接陈述观点，就像这些观点是事实一样。** 例如：
+- ✅ "生命的真正力量来自无目的、累积的自然选择。"
+- ❌ "这本书告诉我们生命的真正力量来自无目的、累积的自然选择。"
 
 ### 重要要求
 
@@ -279,6 +294,15 @@ const buildPrompt = (book) => {
   * 它如何影响读者的思考或生活（用一段话展开）
 - 语言简洁有力，有情感共鸣，但内容要充实，不能简短
 - **重要：** 在内容开头，提供2-4句话的简洁总结，概括这本书的核心价值和为什么值得读（这段总结将用于分享卡片）
+- **关键要求（必须严格遵守）：** 
+  * 开头的2-4句总结必须直接陈述书籍的核心观点，绝对不要使用任何元评论性表述
+  * 禁止使用："这本书告诉我们"、"作者认为"、"书中提到"、"这本书说"、"它告诉我们"、"这本书的核心是"等任何间接表述
+  * 直接说出观点本身，就像这些观点是客观事实一样
+  * 示例对比：
+    - ❌ 错误："这本书告诉我们人是有需求的动物，除短暂的时间外，极少达到完全满足的状态。"
+    - ✅ 正确："人是一种不断需求的动物，除短暂的时间外，极少达到完全满足的状态。"
+    - ❌ 错误："这本书揭示了生命的真正力量来自无目的、累积的自然选择。"
+    - ✅ 正确："生命的真正力量来自无目的、累积的自然选择，而非有意识的设计者。"
 
 **Version 2 (deep_dive - 10分钟思考):**
 - 必须详细梳理6-8个核心观点（不能少于6个），每个观点用一段话（至少6-8句话）深入阐述，包括：
@@ -451,13 +475,9 @@ const ensureSummary = async (bookId) => {
     };
   }
   
-  // 如果已缓存但未批准，返回待审核提示
-  if (cached && cached.status === "pending") {
-    throw new Error("内容审核中，请稍后再试");
-  }
-  
-  // 如果被拒绝，删除并重新生成
-  if (cached && cached.status === "rejected") {
+  // 如果存在但状态不是 approved，删除并重新生成
+  if (cached && cached.status !== "approved") {
+    console.log(`🔄 Book ${bookId} has status "${cached.status}", regenerating...`);
     delete cache[bookId];
     await writeCache(cache);
   }
@@ -472,13 +492,19 @@ const ensureSummary = async (bookId) => {
     // 自动质量检查
     const validation = validateSummary(summary);
     
-    // 设置审核状态
+    // 如果验证失败，不保存到缓存，直接抛出错误触发重新生成
+    if (!validation.valid) {
+      console.warn(`⚠️  Book ${bookId} summary failed validation:`, validation.issues);
+      throw new Error(`内容质量检查未通过: ${validation.issues.join(", ")}`);
+    }
+    
+    // 验证通过，直接批准并保存
     const summaryWithStatus = {
       ...summary,
-      status: validation.valid ? "pending" : "rejected",
-      validationIssues: validation.issues,
-      reviewedAt: null,
-      reviewedBy: null,
+      status: "approved",  // 直接设置为 approved
+      validationIssues: [],  // 验证通过，没有问题
+      reviewedAt: Date.now(),
+      reviewedBy: "system",  // 标记为系统自动审核
       createdAt: summary.createdAt || Date.now(),
       source: summary.source || "deepseek"
     };
@@ -486,19 +512,21 @@ const ensureSummary = async (bookId) => {
     cache[bookId] = summaryWithStatus;
     await writeCache(cache);
     
-    // 如果自动检查失败，抛出错误
-    if (!validation.valid) {
-      console.warn(`⚠️  Book ${bookId} summary failed validation:`, validation.issues);
-      throw new Error(`内容质量检查未通过: ${validation.issues.join(", ")}`);
-    }
+    console.log(`✅ Book ${bookId} summary auto-approved by system`);
     
-    // 如果通过检查但需要审核，返回待审核提示
-    throw new Error("内容已生成，等待审核中");
+    // 直接返回内容
+    return {
+      resonance: summaryWithStatus.resonance,
+      deep_dive: summaryWithStatus.deep_dive,
+      masterclass: summaryWithStatus.masterclass,
+      createdAt: summaryWithStatus.createdAt,
+      source: summaryWithStatus.source
+    };
     
   } catch (err) {
-    // 如果是审核相关的错误，直接抛出
-    if (err.message.includes("审核") || err.message.includes("质量检查")) {
-      throw err;
+    // 如果是验证失败，重新生成（会递归调用，但应该避免无限循环）
+    if (err.message.includes("质量检查")) {
+      throw err;  // 会触发重新生成
     }
     
     // 其他错误，返回错误摘要
@@ -691,15 +719,57 @@ const requestListener = async (req, res) => {
 
   // 审核管理 API
   
-  // 获取待审核列表
+  // 检查特定书籍的缓存状态
+  if (req.method === "GET" && urlObj.pathname === "/api/admin/check-book") {
+    try {
+      const bookId = urlObj.searchParams.get('id');
+      if (!bookId) {
+        return sendJson(res, 400, { error: "缺少 id 参数" });
+      }
+      
+      const cache = await readCache();
+      const cached = cache[bookId];
+      const book = books.find(b => b.id === Number(bookId));
+      
+      return sendJson(res, 200, {
+        bookId: Number(bookId),
+        book: book ? {
+          id: book.id,
+          title_cn: book.title_cn,
+          title_en: book.title_en,
+          author: book.author
+        } : null,
+        cached: !!cached,
+        status: cached?.status || (cached ? "legacy" : "not_found"),
+        hasResonance: !!cached?.resonance,
+        hasDeepDive: !!cached?.deep_dive,
+        hasMasterclass: !!cached?.masterclass,
+        createdAt: cached?.createdAt,
+        reviewedAt: cached?.reviewedAt,
+        validationIssues: cached?.validationIssues || [],
+        needsMigration: cached && !cached.status, // 旧格式需要迁移
+        resonanceLength: cached?.resonance?.length || 0,
+        deepDiveLength: cached?.deep_dive?.length || 0,
+        masterclassLength: cached?.masterclass?.length || 0
+      });
+    } catch (err) {
+      console.error("Error checking book:", err);
+      return sendJson(res, 500, { error: "检查失败" });
+    }
+  }
+
+  // 获取待审核列表（主要用于查看旧格式内容，现在不再有 pending 状态）
   if (req.method === "GET" && urlObj.pathname === "/api/admin/pending") {
     try {
       const cache = await readCache();
       const pending = [];
       
       for (const [id, summary] of Object.entries(cache)) {
-        if (summary.status === "pending") {
+        // 现在只包含没有 status 的旧格式内容（不再有 pending 状态）
+        if (!summary.status) {
           const book = books.find(b => b.id === Number(id));
+          const needsMigration = !summary.status; // 标记旧格式
+          
           pending.push({
             bookId: Number(id),
             book: book ? {
@@ -714,8 +784,10 @@ const requestListener = async (req, res) => {
               masterclass: summary.masterclass ? summary.masterclass.substring(0, 300) + "..." : ""
             },
             validationIssues: summary.validationIssues || [],
-            createdAt: summary.createdAt,
-            fullSummary: summary // 包含完整内容用于审核
+            createdAt: summary.createdAt || Date.now(),
+            fullSummary: summary, // 包含完整内容用于审核
+            needsMigration: needsMigration, // 标记是否需要迁移
+            currentStatus: summary.status || "legacy" // 当前状态
           });
         }
       }
@@ -760,10 +832,26 @@ const requestListener = async (req, res) => {
         return sendJson(res, 404, { error: "摘要不存在" });
       }
       
+      const oldStatus = cache[bookId].status;
+      const needsMigration = !oldStatus; // 旧格式没有 status 字段
+      
+      // 如果是旧格式，迁移到新格式
+      if (needsMigration) {
+        console.log(`🔄 Migrating legacy format for book ${bookId}`);
+        // 确保所有必需字段存在
+        if (!cache[bookId].createdAt) {
+          cache[bookId].createdAt = Date.now();
+        }
+        if (!cache[bookId].source) {
+          cache[bookId].source = "deepseek";
+        }
+      }
+      
       cache[bookId].status = "approved";
       cache[bookId].reviewedAt = Date.now();
       cache[bookId].reviewedBy = "admin"; // 可以后续添加实际用户信息
       
+      console.log(`📝 Status changed: Book ${bookId} -> approved${needsMigration ? ' (migrated from legacy)' : ''} at ${new Date().toISOString()}`);
       await writeCache(cache);
       
       console.log(`✅ Book ${bookId} summary approved`);
@@ -806,7 +894,9 @@ const requestListener = async (req, res) => {
       }
       
       // 删除缓存，下次访问会重新生成
+      const oldStatus = cache[bookId]?.status;
       delete cache[bookId];
+      console.log(`📝 Status changed: Book ${bookId} -> deleted (was ${oldStatus}) at ${new Date().toISOString()}`);
       await writeCache(cache);
       
       console.log(`❌ Book ${bookId} summary rejected${reason ? `: ${reason}` : ""}`);
@@ -888,9 +978,24 @@ const requestListener = async (req, res) => {
       
       for (const bookId of bookIds) {
         if (cache[bookId]) {
+          const oldStatus = cache[bookId].status;
+          const needsMigration = !oldStatus; // 旧格式没有 status 字段
+          
+          // 如果是旧格式，迁移到新格式
+          if (needsMigration) {
+            console.log(`🔄 Migrating legacy format for book ${bookId}`);
+            if (!cache[bookId].createdAt) {
+              cache[bookId].createdAt = Date.now();
+            }
+            if (!cache[bookId].source) {
+              cache[bookId].source = "deepseek";
+            }
+          }
+          
           cache[bookId].status = "approved";
           cache[bookId].reviewedAt = Date.now();
           cache[bookId].reviewedBy = "admin";
+          console.log(`📝 Status changed: Book ${bookId} -> approved${needsMigration ? ' (migrated from legacy)' : ` (was ${oldStatus})`} at ${new Date().toISOString()}`);
           approved.push(bookId);
         } else {
           notFound.push(bookId);
@@ -937,7 +1042,12 @@ const requestListener = async (req, res) => {
       return sendJson(res, 200, { summary });
     } catch (err) {
       console.error(`   ❌ Error in ensureSummary:`, err);
-      return sendJson(res, 500, { error: "无法生成摘要" });
+      
+      // 所有错误返回 500（不再有 202 状态码，因为不再有 pending 状态）
+      return sendJson(res, 500, { 
+        error: "无法生成摘要",
+        details: err.message 
+      });
     }
   }
 
