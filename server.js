@@ -1323,41 +1323,42 @@ setTimeout(async () => {
       
       if (!cache[todayBook.id] || cache[todayBook.id].status !== "approved") {
         console.log(`📚 优先生成今天的内容: ${todayBook.title_cn}`);
-      try {
-        const summary = await callDeepSeek(todayBook);
-        const validation = validateSummary(summary);
-        
-        if (validation.valid) {
-          const summaryWithStatus = {
-            ...summary,
-            status: "approved",
-            validationIssues: [],
-            reviewedAt: Date.now(),
-            reviewedBy: "system",
-            createdAt: Date.now(),
-            source: "deepseek"
-          };
+        try {
+          const summary = await callDeepSeek(todayBook);
+          const validation = validateSummary(summary);
           
-          const updatedCache = await readCache();
-          updatedCache[todayBook.id] = summaryWithStatus;
-          await writeCache(updatedCache);
-          console.log(`✅ 今天的内容已生成并批准: ${todayBook.title_cn}（书籍ID: ${todayBook.id}）`);
-          console.log(`   📝 缓存已保存，resonance: ${summary.resonance.length}字, deep_dive: ${summary.deep_dive.length}字, masterclass: ${summary.masterclass.length}字`);
-          console.log(`   🔍 验证缓存: 重新读取缓存检查书籍 ${todayBook.id}...`);
-          const verifyCache = await readCache();
-          if (verifyCache[todayBook.id] && verifyCache[todayBook.id].status === "approved") {
-            console.log(`   ✅ 缓存验证成功：书籍 ${todayBook.id} 已正确保存`);
+          if (validation.valid) {
+            const summaryWithStatus = {
+              ...summary,
+              status: "approved",
+              validationIssues: [],
+              reviewedAt: Date.now(),
+              reviewedBy: "system",
+              createdAt: Date.now(),
+              source: "deepseek"
+            };
+            
+            const updatedCache = await readCache();
+            updatedCache[todayBook.id] = summaryWithStatus;
+            await writeCache(updatedCache);
+            console.log(`✅ 今天的内容已生成并批准: ${todayBook.title_cn}（书籍ID: ${todayBook.id}）`);
+            console.log(`   📝 缓存已保存，resonance: ${summary.resonance.length}字, deep_dive: ${summary.deep_dive.length}字, masterclass: ${summary.masterclass.length}字`);
+            console.log(`   🔍 验证缓存: 重新读取缓存检查书籍 ${todayBook.id}...`);
+            const verifyCache = await readCache();
+            if (verifyCache[todayBook.id] && verifyCache[todayBook.id].status === "approved") {
+              console.log(`   ✅ 缓存验证成功：书籍 ${todayBook.id} 已正确保存`);
+            } else {
+              console.error(`   ❌ 缓存验证失败：书籍 ${todayBook.id} 未正确保存！`);
+            }
           } else {
-            console.error(`   ❌ 缓存验证失败：书籍 ${todayBook.id} 未正确保存！`);
+            console.error(`⚠️  今天的内容质量检查未通过: ${validation.issues.join(", ")}`);
           }
-        } else {
-          console.error(`⚠️  今天的内容质量检查未通过: ${validation.issues.join(", ")}`);
+        } catch (err) {
+          console.error(`❌ 生成今天的内容失败:`, err.message);
         }
-      } catch (err) {
-        console.error(`❌ 生成今天的内容失败:`, err.message);
+      } else {
+        console.log(`✅ 今天的内容已存在: ${todayBook.title_cn}`);
       }
-    } else {
-      console.log(`✅ 今天的内容已存在: ${todayBook.title_cn}`);
     }
     
     // 然后生成未来的内容
