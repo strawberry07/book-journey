@@ -662,6 +662,11 @@ const serveStatic = async (req, res) => {
         ".js": "application/javascript",
         ".css": "text/css",
         ".json": "application/json",
+        ".svg": "image/svg+xml",
+        ".png": "image/png",
+        ".jpg": "image/jpeg",
+        ".jpeg": "image/jpeg",
+        ".ico": "image/x-icon",
       }[ext] || "text/plain";
     res.writeHead(200, { "Content-Type": mime });
     res.end(data);
