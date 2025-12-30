@@ -158,12 +158,22 @@ const loadBookForDate = async (date) => {
     summaryEl.innerHTML = "";
     buttons.forEach((btn) => btn.classList.remove("active"));
   } catch (err) {
-    console.error(err);
+    console.error("❌ Error loading book:", err);
+    
+    // 友好的错误消息
+    let userMessage = "获取书目失败，请稍后再试";
     if (err.message && err.message.includes("无法查看")) {
-      statusEl.textContent = err.message;
-    } else {
-      statusEl.textContent = "无法获取书目，请稍后重试";
+      userMessage = err.message;
+    } else if (err.message && (err.message.includes("503") || err.message.includes("维护"))) {
+      userMessage = "系统维护中，请稍后再试";
+    } else if (err.message && (err.message.includes("网络") || err.message.includes("fetch") || err.message.includes("Failed to fetch"))) {
+      userMessage = "网络连接异常，请检查网络后重试";
     }
+    
+    statusEl.textContent = userMessage;
+    titleCnEl.textContent = "加载失败";
+    titleEnEl.textContent = "";
+    authorEl.textContent = "";
   }
 };
 
