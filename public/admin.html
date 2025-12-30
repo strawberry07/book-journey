@@ -360,38 +360,31 @@
       }
     }
     
-    async function preGenerate() {
-      const countInput = document.getElementById('pregen-count');
-      const count = parseInt(countInput.value, 10);
+    async     function preGenerate() {
       const btn = document.getElementById('pregen-btn');
       const status = document.getElementById('pregen-status');
       const progress = document.getElementById('pregen-progress');
       const progressBar = document.getElementById('pregen-progress-bar');
       const log = document.getElementById('pregen-log');
       
-      if (isNaN(count) || count <= 0 || count > 100) {
-        alert('请输入 1-100 之间的数字');
-        return;
-      }
-      
-      if (!confirm(`确定要预生成未来 ${count} 天的内容吗？\n\n这将调用 DeepSeek API ${count} 次，可能需要几分钟时间。`)) {
+      if (!confirm(`确定要开始智能预生成吗？\n\n这将从启动日期（2026-01-01）开始检查并生成缺失的内容，可能需要几分钟时间。`)) {
         return;
       }
       
       // 禁用按钮
       btn.disabled = true;
       btn.textContent = '⏳ 生成中...';
-      status.textContent = '已开始预生成，请稍候...';
+      status.textContent = '已开始智能预生成，请稍候...';
       status.style.color = '#2f6feb';
       progress.style.display = 'block';
       progressBar.style.width = '0%';
-      log.innerHTML = '开始预生成...<br>';
+      log.innerHTML = '开始智能预生成（从启动日期开始检查）...<br>';
       
       try {
         const res = await fetch('/api/admin/pre-generate', {
           method: 'POST',
           headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify({ count })
+          body: JSON.stringify({})
         });
         
         const data = await res.json();
@@ -399,9 +392,10 @@
         if (data.success) {
           status.textContent = `✅ ${data.message}`;
           status.style.color = '#28a745';
-          log.innerHTML += `✅ 预生成任务已启动<br>`;
-          log.innerHTML += `📝 正在后台生成 ${count} 天的内容...<br>`;
-          log.innerHTML += `💡 提示：生成完成后，点击"刷新"按钮查看待审核内容<br>`;
+          log.innerHTML += `✅ 智能预生成任务已启动<br>`;
+          log.innerHTML += `📅 启动日期: ${data.startDate || '2026-01-01'}<br>`;
+          log.innerHTML += `📝 正在后台检查并生成缺失的内容...<br>`;
+          log.innerHTML += `💡 提示：生成完成后，内容会自动通过系统审核<br>`;
           
           // 模拟进度（实际进度需要轮询或 WebSocket，这里简化处理）
           let progressValue = 0;
