@@ -118,6 +118,38 @@
     </footer>
 
     <script src="/app.js" type="module"></script>
+    
+    <!-- Service Worker Registration -->
+    <script>
+      if ('serviceWorker' in navigator) {
+        window.addEventListener('load', () => {
+          navigator.serviceWorker.register('/sw.js')
+            .then((registration) => {
+              console.log('✅ Service Worker registered:', registration.scope);
+              
+              // 检查更新
+              registration.addEventListener('updatefound', () => {
+                const newWorker = registration.installing;
+                newWorker.addEventListener('statechange', () => {
+                  if (newWorker.state === 'installed' && navigator.serviceWorker.controller) {
+                    // 新版本可用，提示用户刷新
+                    console.log('🔄 New version available! Refresh to update.');
+                  }
+                });
+              });
+            })
+            .catch((error) => {
+              console.error('❌ Service Worker registration failed:', error);
+            });
+          
+          // 监听 Service Worker 更新
+          navigator.serviceWorker.addEventListener('controllerchange', () => {
+            console.log('🔄 Service Worker updated, reloading...');
+            window.location.reload();
+          });
+        });
+      }
+    </script>
   </body>
 </html>
 
