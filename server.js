@@ -23,6 +23,9 @@ const APP_START_DATE = new Date("2026-01-01");
 APP_START_DATE.setHours(0, 0, 0, 0);
 const APP_START_DATE_STR = APP_START_DATE.toISOString().split("T")[0]; // "2026-01-01"
 
+// 维护模式：通过环境变量控制
+const MAINTENANCE_MODE = process.env.MAINTENANCE_MODE === 'true';
+
 const loadJson = async (filePath, fallback) => {
   try {
     const raw = await fs.readFile(filePath, "utf8");
@@ -628,6 +631,31 @@ const requestListener = async (req, res) => {
   const urlObj = new URL(req.url, `http://${req.headers.host || 'localhost'}`);
   console.log(`📨 ${req.method} ${urlObj.pathname}`);
 
+  // CORS headers for all responses
+  const corsHeaders = {
+    "Access-Control-Allow-Origin": "*",
+    "Access-Control-Allow-Methods": "GET, POST, OPTIONS",
+    "Access-Control-Allow-Headers": "Content-Type",
+  };
+
+  // 维护模式检查（允许健康检查和admin界面）
+  if (MAINTENANCE_MODE && 
+      !urlObj.pathname.startsWith('/health') && 
+      !urlObj.pathname.startsWith('/admin.html') &&
+      !urlObj.pathname.startsWith('/api/admin')) {
+    res.writeHead(503, {
+      ...corsHeaders,
+      "Content-Type": "application/json",
+    });
+    res.end(JSON.stringify({ 
+      error: "系统维护中，请稍后再试",
+      maintenance: true,
+      estimatedTime: "30分钟",
+      timestamp: new Date().toISOString()
+    }));
+    return;
+  }
+
   // Handle CORS preflight requests
   if (req.method === "OPTIONS") {
     res.writeHead(200, {
@@ -641,12 +669,44 @@ const requestListener = async (req, res) => {
 
   // Health check endpoint for Railway/deployment platforms
   if (req.method === "GET" && urlObj.pathname === "/health") {
-    res.writeHead(200, { 
-      "Content-Type": "application/json",
-      "Access-Control-Allow-Origin": "*",
-    });
-    res.end(JSON.stringify({ status: "ok", service: "book-journey", timestamp: Date.now() }));
-    return;
+    try {
+      const cache = await readCache();
+      const cacheSize = Object.keys(cache).length;
+      const hasApiKey = !!DEEPSEEK_API_KEY;
+      const approvedCount = Object.values(cache).filter(item => item.status === "approved").length;
+      
+      res.writeHead(200, { 
+        "Content-Type": "application/json",
+        "Access-Control-Allow-Origin": "*",
+      });
+      res.end(JSON.stringify({ 
+        status: "ok",
+        service: "book-journey",
+        timestamp: new Date().toISOString(),
+        maintenance: MAINTENANCE_MODE,
+        cache: {
+          size: cacheSize,
+          approved: approvedCount,
+          healthy: cacheSize > 0
+        },
+        api: {
+          configured: hasApiKey
+        },
+        startDate: APP_START_DATE_STR
+      }));
+      return;
+    } catch (err) {
+      res.writeHead(503, { 
+        "Content-Type": "application/json",
+        "Access-Control-Allow-Origin": "*",
+      });
+      res.end(JSON.stringify({ 
+        status: "degraded",
+        error: err.message,
+        timestamp: new Date().toISOString()
+      }));
+      return;
+    }
   }
 
   // List cache endpoint

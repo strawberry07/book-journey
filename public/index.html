@@ -30,7 +30,10 @@
       <section class="card">
         <div class="card-header">
           <div class="book-meta">
-            <p class="label date-label"><span id="date-display" class="date-text"></span></p>
+            <p class="label date-label">
+              <span id="date-display" class="date-text"></span>
+              <span id="app-start-date" class="app-start-hint" style="display: none; font-size: 12px; color: #999; margin-left: 10px;"></span>
+            </p>
             <h2 id="title-cn">加载中...</h2>
             <p id="title-en" class="title-en"></p>
             <p id="author" class="muted"></p>
@@ -92,6 +95,13 @@
         </div>
       </div>
     </div>
+
+    <footer style="text-align: center; padding: 30px 20px; color: #999; font-size: 12px; margin-top: 40px;">
+      <p style="margin-bottom: 10px;">读书便佳</p>
+      <p style="margin-top: 10px;">
+        <a href="mailto:your-email@example.com" style="color: #666; text-decoration: none; border-bottom: 1px solid #ccc; padding-bottom: 2px;">遇到问题？联系我们</a>
+      </p>
+    </footer>
 
     <script src="/app.js" type="module"></script>
   </body>

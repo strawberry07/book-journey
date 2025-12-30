@@ -1,8 +1,11 @@
 const statusEl = document.getElementById("status");
 const summaryEl = document.getElementById("summary");
+const dateDisplayEl = document.getElementById("date-display");
+const appStartDateEl = document.getElementById("app-start-date");
 const titleCnEl = document.getElementById("title-cn");
 const titleEnEl = document.getElementById("title-en");
 const authorEl = document.getElementById("author");
+const statusEl = document.getElementById("status");
 const dateDisplayEl = document.getElementById("date-display");
 const prevDayBtn = document.getElementById("prev-day");
 const nextDayBtn = document.getElementById("next-day");
@@ -107,6 +110,35 @@ const loadBookForDate = async (date) => {
     titleCnEl.textContent = `《${currentBook.title_cn}》`;
     titleEnEl.textContent = currentBook.title_en;
     authorEl.textContent = `作者：${currentBook.author || "未知"}`;
+    
+    // 显示应用启动日期信息
+    if (data.appStartDate) {
+      appStartDate = data.appStartDate;
+      const startDate = new Date(data.appStartDate);
+      const startDateStr = formatDate(startDate);
+      const today = new Date();
+      today.setHours(0, 0, 0, 0);
+      const startDateOnly = new Date(startDate);
+      startDateOnly.setHours(0, 0, 0, 0);
+      
+      // 如果当前日期就是启动日期，显示提示
+      if (dateOnly.getTime() === startDateOnly.getTime()) {
+        appStartDateEl.textContent = "（应用启动日）";
+        appStartDateEl.style.display = "inline";
+      } else if (dateOnly < today) {
+        // 显示启动日期信息
+        appStartDateEl.textContent = `（启动于 ${startDateStr}）`;
+        appStartDateEl.style.display = "inline";
+      } else {
+        appStartDateEl.style.display = "none";
+      }
+      
+      // 更新前一天按钮状态
+      prevDayBtn.disabled = dateOnly <= startDateOnly;
+      
+      console.log(`📅 应用启动日期: ${startDateStr}`);
+    }
+    
     statusEl.textContent = "选择上方深度开始阅读";
     
     // Clear summary when changing dates
@@ -210,7 +242,66 @@ const loadSummary = async (depth) => {
       stack: err.stack,
       name: err.name
     });
-    statusEl.textContent = `获取摘要失败：${err.message || "请稍后再试"}`;
+    
+    // 更友好的错误消息
+    let userMessage = "获取摘要失败，请稍后再试";
+    let shouldRetry = false;
+    let retryDelay = 5000; // 5秒后重试
+    
+    if (err.message.includes("500") || err.message.includes("无法生成")) {
+      userMessage = "内容生成中，请稍候片刻后重试";
+      shouldRetry = true;
+    } else if (err.message.includes("网络") || err.message.includes("fetch") || err.message.includes("Failed to fetch")) {
+      userMessage = "网络连接异常，请检查网络后重试";
+      shouldRetry = true;
+    } else if (err.message.includes("503") || err.message.includes("维护")) {
+      userMessage = "系统维护中，请稍后再试";
+      shouldRetry = false;
+    } else if (err.message.includes("timeout") || err.message.includes("超时")) {
+      userMessage = "请求超时，正在重试...";
+      shouldRetry = true;
+      retryDelay = 3000; // 3秒后重试
+    }
+    
+    statusEl.textContent = userMessage;
+    
+    // 自动重试机制
+    if (shouldRetry && currentBook) {
+      let retryCount = 0;
+      const maxRetries = 3;
+      
+      const retry = () => {
+        retryCount++;
+        if (retryCount <= maxRetries) {
+          console.log(`🔄 自动重试 (${retryCount}/${maxRetries})...`);
+          statusEl.textContent = `${userMessage} (重试 ${retryCount}/${maxRetries})`;
+          
+          setTimeout(async () => {
+            try {
+              const url = `/api/book/${currentBook.id}/summary`;
+              const data = await fetchJson(url);
+              const summary = data.summary;
+              if (summary && summary[depth]) {
+                renderSummary(depth, summary[depth]);
+                statusEl.textContent = "";
+                return; // 成功，停止重试
+              }
+            } catch (retryErr) {
+              console.error(`❌ 重试 ${retryCount} 失败:`, retryErr);
+              if (retryCount < maxRetries) {
+                retry(); // 继续重试
+              } else {
+                statusEl.textContent = "多次重试失败，请稍后再试";
+              }
+            }
+          }, retryDelay);
+        } else {
+          statusEl.textContent = "多次重试失败，请稍后再试";
+        }
+      };
+      
+      retry();
+    }
   }
 };
 
