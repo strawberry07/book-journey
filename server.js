@@ -1221,7 +1221,8 @@ const smartPreGenerate = async () => {
                 const updatedCache = await readCache();
                 updatedCache[book.id] = summaryWithStatus;
                 await writeCache(updatedCache);
-                console.log(`   ✅ ${item.date}: ${item.book} 已生成并批准`);
+                console.log(`   ✅ ${item.date}: ${item.book} 已生成并批准（书籍ID: ${book.id}）`);
+                console.log(`      📝 缓存已保存，resonance: ${summary.resonance.length}字, deep_dive: ${summary.deep_dive.length}字, masterclass: ${summary.masterclass.length}字`);
                 successCount++;
               } else {
                 console.error(`   ⚠️  ${item.date}: ${item.book} 质量检查未通过: ${validation.issues.join(", ")}`);
@@ -1292,7 +1293,15 @@ setTimeout(async () => {
           const updatedCache = await readCache();
           updatedCache[todayBook.id] = summaryWithStatus;
           await writeCache(updatedCache);
-          console.log(`✅ 今天的内容已生成并批准: ${todayBook.title_cn}`);
+          console.log(`✅ 今天的内容已生成并批准: ${todayBook.title_cn}（书籍ID: ${todayBook.id}）`);
+          console.log(`   📝 缓存已保存，resonance: ${summary.resonance.length}字, deep_dive: ${summary.deep_dive.length}字, masterclass: ${summary.masterclass.length}字`);
+          console.log(`   🔍 验证缓存: 重新读取缓存检查书籍 ${todayBook.id}...`);
+          const verifyCache = await readCache();
+          if (verifyCache[todayBook.id] && verifyCache[todayBook.id].status === "approved") {
+            console.log(`   ✅ 缓存验证成功：书籍 ${todayBook.id} 已正确保存`);
+          } else {
+            console.error(`   ❌ 缓存验证失败：书籍 ${todayBook.id} 未正确保存！`);
+          }
         } else {
           console.error(`⚠️  今天的内容质量检查未通过: ${validation.issues.join(", ")}`);
         }
