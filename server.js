@@ -762,8 +762,41 @@ const requestListener = async (req, res) => {
       if (!date) {
         return sendJson(res, 400, { error: "缺少日期参数" });
       }
+      
+      // 检查请求的日期是否在应用启动日期之后
+      const history = await readHistory();
+      let appStartDate = new Date();
+      if (history.selections && history.selections.length > 0) {
+        const earliestTimestamp = Math.min(...history.selections.map(s => s.timestamp));
+        appStartDate = new Date(earliestTimestamp);
+        appStartDate.setHours(0, 0, 0, 0);
+      }
+      
+      const requestedDate = new Date(date);
+      requestedDate.setHours(0, 0, 0, 0);
+      const today = new Date();
+      today.setHours(0, 0, 0, 0);
+      
+      // 如果请求的日期在应用启动日期之前，返回错误
+      if (requestedDate < appStartDate) {
+        return sendJson(res, 400, { 
+          error: `无法查看 ${date} 的内容，应用从 ${appStartDate.toISOString().split("T")[0]} 开始运行` 
+        });
+      }
+      
+      // 如果请求的日期在今天之后，返回错误
+      if (requestedDate > today) {
+        return sendJson(res, 400, { 
+          error: `无法查看未来日期的内容` 
+        });
+      }
+      
       const book = await getBookForDate(date);
-      return sendJson(res, 200, { book, date });
+      return sendJson(res, 200, { 
+        book,
+        date: date,
+        appStartDate: appStartDate.toISOString().split("T")[0]
+      });
     } catch (err) {
       console.error(err);
       return sendJson(res, 500, { error: "无法获取指定日期的书目" });
