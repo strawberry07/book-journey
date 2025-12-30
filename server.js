@@ -18,6 +18,11 @@ const STATE_PATH = path.join(DATA_DIR, "state.json");
 // Example (zsh): export DEEPSEEK_API_KEY="your-real-key"
 const DEEPSEEK_API_KEY = process.env.DEEPSEEK_API_KEY;
 
+// 应用启动日期：2026年1月1日
+const APP_START_DATE = new Date("2026-01-01");
+APP_START_DATE.setHours(0, 0, 0, 0);
+const APP_START_DATE_STR = APP_START_DATE.toISOString().split("T")[0]; // "2026-01-01"
+
 const loadJson = async (filePath, fallback) => {
   try {
     const raw = await fs.readFile(filePath, "utf8");
@@ -735,20 +740,19 @@ const requestListener = async (req, res) => {
   if (req.method === "GET" && urlObj.pathname === "/api/book/today") {
     try {
       const book = await getTodaysBook();
-      // 获取应用启动日期（从历史记录中最早的日期，或使用今天的日期）
-      const history = await readHistory();
-      let appStartDate = new Date();
-      if (history.selections && history.selections.length > 0) {
-        const earliestTimestamp = Math.min(...history.selections.map(s => s.timestamp));
-        appStartDate = new Date(earliestTimestamp);
-        appStartDate.setHours(0, 0, 0, 0);
-      }
       const today = new Date();
       today.setHours(0, 0, 0, 0);
       
+      // 如果今天在启动日期之前，返回错误
+      if (today < APP_START_DATE) {
+        return sendJson(res, 400, { 
+          error: `应用将从 ${APP_START_DATE_STR} 开始运行` 
+        });
+      }
+      
       return sendJson(res, 200, { 
         book,
-        appStartDate: appStartDate.toISOString().split("T")[0] // 返回应用启动日期
+        appStartDate: APP_START_DATE_STR // 返回固定的应用启动日期
       });
     } catch (err) {
       console.error(err);
@@ -763,24 +767,15 @@ const requestListener = async (req, res) => {
         return sendJson(res, 400, { error: "缺少日期参数" });
       }
       
-      // 检查请求的日期是否在应用启动日期之后
-      const history = await readHistory();
-      let appStartDate = new Date();
-      if (history.selections && history.selections.length > 0) {
-        const earliestTimestamp = Math.min(...history.selections.map(s => s.timestamp));
-        appStartDate = new Date(earliestTimestamp);
-        appStartDate.setHours(0, 0, 0, 0);
-      }
-      
       const requestedDate = new Date(date);
       requestedDate.setHours(0, 0, 0, 0);
       const today = new Date();
       today.setHours(0, 0, 0, 0);
       
       // 如果请求的日期在应用启动日期之前，返回错误
-      if (requestedDate < appStartDate) {
+      if (requestedDate < APP_START_DATE) {
         return sendJson(res, 400, { 
-          error: `无法查看 ${date} 的内容，应用从 ${appStartDate.toISOString().split("T")[0]} 开始运行` 
+          error: `无法查看 ${date} 的内容，应用从 ${APP_START_DATE_STR} 开始运行` 
         });
       }
       
@@ -795,7 +790,7 @@ const requestListener = async (req, res) => {
       return sendJson(res, 200, { 
         book,
         date: date,
-        appStartDate: appStartDate.toISOString().split("T")[0]
+        appStartDate: APP_START_DATE_STR
       });
     } catch (err) {
       console.error(err);
@@ -1314,14 +1309,20 @@ const smartPreGenerate = async () => {
 setTimeout(async () => {
   console.log('🚀 启动智能预生成检查...');
   try {
-    // 先检查并生成今天的内容（优先级最高）
+    // 先检查并生成今天的内容（优先级最高），但只在启动日期之后
     const cache = await readCache();
     const today = new Date();
-    const todayStr = today.toISOString().split("T")[0];
-    const todayBook = await getBookForDate(todayStr);
+    today.setHours(0, 0, 0, 0);
     
-    if (!cache[todayBook.id] || cache[todayBook.id].status !== "approved") {
-      console.log(`📚 优先生成今天的内容: ${todayBook.title_cn}`);
+    // 如果今天在启动日期之前，不生成今天的内容
+    if (today < APP_START_DATE) {
+      console.log(`📅 今天是 ${today.toISOString().split("T")[0]}，应用将从 ${APP_START_DATE_STR} 开始运行，跳过今天的生成`);
+    } else {
+      const todayStr = today.toISOString().split("T")[0];
+      const todayBook = await getBookForDate(todayStr);
+      
+      if (!cache[todayBook.id] || cache[todayBook.id].status !== "approved") {
+        console.log(`📚 优先生成今天的内容: ${todayBook.title_cn}`);
       try {
         const summary = await callDeepSeek(todayBook);
         const validation = validateSummary(summary);
