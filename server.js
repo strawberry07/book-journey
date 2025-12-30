@@ -473,6 +473,7 @@ const callDeepSeek = async (book) => {
 };
 
 const ensureSummary = async (bookId) => {
+  console.log(`🔍 [ensureSummary] 检查书籍 ${bookId} 的缓存状态...`);
   const cache = await readCache();
   const cached = cache[bookId];
   
@@ -485,6 +486,7 @@ const ensureSummary = async (bookId) => {
       delete cache[bookId];
       await writeCache(cache);
     } else {
+      console.log(`✅ [ensureSummary] 从缓存返回书籍 ${bookId} 的内容（已批准）`);
       return {
         resonance: cached.resonance,
         deep_dive: cached.deep_dive,
@@ -493,6 +495,10 @@ const ensureSummary = async (bookId) => {
         source: cached.source
       };
     }
+  } else if (cached) {
+    console.log(`⚠️  [ensureSummary] 书籍 ${bookId} 在缓存中但状态为 "${cached.status}"，需要重新生成`);
+  } else {
+    console.log(`❌ [ensureSummary] 书籍 ${bookId} 不在缓存中，需要生成`);
   }
   
   // 如果存在但状态不是 approved，删除并重新生成
@@ -1070,8 +1076,10 @@ const requestListener = async (req, res) => {
     }
     try {
       console.log(`   ✅ Processing summary request for book ID: ${id}`);
+      const startTime = Date.now();
       const summary = await ensureSummary(id);
-      console.log(`   ✅ Summary generated/retrieved successfully`);
+      const duration = Date.now() - startTime;
+      console.log(`   ✅ Summary generated/retrieved successfully in ${duration}ms`);
       return sendJson(res, 200, { summary });
     } catch (err) {
       console.error(`   ❌ Error in ensureSummary:`, err);
