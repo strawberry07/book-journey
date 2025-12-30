@@ -2,8 +2,12 @@
 // 这个脚本会创建一个简单的 favicon.ico 的替代方案
 // 注意：实际生产环境建议使用专业的图标生成工具
 
-const fs = require('fs');
-const path = require('path');
+import fs from 'fs';
+import path from 'path';
+import { fileURLToPath } from 'url';
+
+const __filename = fileURLToPath(import.meta.url);
+const __dirname = path.dirname(__filename);
 
 // 创建一个简单的 HTML 文件来生成图标（使用 canvas）
 const iconHTML = `<!DOCTYPE html>
@@ -69,7 +73,7 @@ const iconHTML = `<!DOCTYPE html>
 
 // 保存 HTML 文件
 fs.writeFileSync(
-  path.join(__dirname, 'public', 'generate-icon.html'),
+  path.join(__dirname, 'generate-icon.html'),
   iconHTML,
   'utf8'
 );
