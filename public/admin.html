@@ -132,22 +132,13 @@
     </div>
     
     <div style="background: white; border-radius: 8px; padding: 20px; margin-bottom: 20px; box-shadow: 0 2px 4px rgba(0,0,0,0.1);">
-      <h2 style="margin-bottom: 15px; color: #333;">🚀 预生成内容</h2>
+      <h2 style="margin-bottom: 15px; color: #333;">🚀 智能预生成内容</h2>
       <p style="color: #666; margin-bottom: 15px; font-size: 14px;">
-        提前生成未来几天的书籍摘要，方便提前审核。生成的内容会自动进入"待审核"状态。
+        从启动日期（2026-01-01）开始检查并生成缺失的内容，确保用户访问时有缓存可用。生成的内容会自动通过系统审核。
       </p>
       <div style="display: flex; gap: 10px; flex-wrap: wrap; align-items: center;">
-        <input 
-          type="number" 
-          id="pregen-count" 
-          value="10" 
-          min="1" 
-          max="100" 
-          style="padding: 10px; border: 1px solid #ddd; border-radius: 4px; width: 100px; font-size: 14px;"
-        >
-        <span style="color: #666; font-size: 14px;">天</span>
         <button class="btn-pregen" onclick="preGenerate()" id="pregen-btn">
-          🚀 开始预生成
+          🚀 开始智能预生成
         </button>
         <div id="pregen-status" style="margin-left: 10px; font-size: 14px;"></div>
       </div>
@@ -443,9 +434,9 @@
           // 5分钟后停止检查
           setTimeout(() => {
             clearInterval(checkInterval);
-            status.textContent = '✅ 预生成完成，请刷新查看';
+            status.textContent = '✅ 智能预生成完成，请查看服务器日志';
             btn.disabled = false;
-            btn.textContent = '🚀 开始预生成';
+            btn.textContent = '🚀 开始智能预生成';
           }, 300000); // 5分钟
           
         } else {
@@ -456,7 +447,7 @@
         status.style.color = '#dc3545';
         log.innerHTML += `❌ 错误: ${err.message}<br>`;
         btn.disabled = false;
-        btn.textContent = '🚀 开始预生成';
+        btn.textContent = '🚀 开始智能预生成';
       }
     }
     
