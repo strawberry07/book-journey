@@ -94,6 +94,19 @@ const loadBookForDate = async (date) => {
     const dateStr = formatDateForAPI(date);
     const endpoint = isToday(date) ? "/api/book/today" : `/api/book/date?date=${dateStr}`;
     const data = await fetchJson(endpoint);
+    
+    // 检查维护模式
+    if (data.maintenance || data.error?.includes("维护")) {
+      statusEl.textContent = "系统维护中，请稍后再试";
+      titleCnEl.textContent = "系统维护中";
+      titleEnEl.textContent = "";
+      authorEl.textContent = "";
+      if (data.estimatedTime) {
+        statusEl.textContent = `系统维护中，预计 ${data.estimatedTime} 后恢复`;
+      }
+      return;
+    }
+    
     currentBook = data.book;
     
     // 更新应用启动日期（如果API返回了）
