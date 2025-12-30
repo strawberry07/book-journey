@@ -57,6 +57,8 @@ const fetchJson = async (url) => {
   }
 };
 
+let appStartDate = null; // 应用启动日期
+
 const loadBookForDate = async (date) => {
   currentDate = date;
   dateDisplayEl.textContent = formatDate(date);
@@ -68,8 +70,19 @@ const loadBookForDate = async (date) => {
   const dateOnly = new Date(date);
   dateOnly.setHours(0, 0, 0, 0);
   
-  // Enable previous day button if not at the earliest date (can go back to yesterday)
-  prevDayBtn.disabled = false; // Allow going back to previous days
+  // 如果还没有获取应用启动日期，从API响应中获取
+  if (!appStartDate) {
+    // 会在API响应后设置
+  }
+  
+  // Disable previous day button if at app start date
+  if (appStartDate) {
+    const startDateOnly = new Date(appStartDate);
+    startDateOnly.setHours(0, 0, 0, 0);
+    prevDayBtn.disabled = dateOnly <= startDateOnly;
+  } else {
+    prevDayBtn.disabled = false; // 暂时允许，等API返回后更新
+  }
   
   // Disable next day button if at today or future
   nextDayBtn.disabled = isToday(date) || dateOnly > today;
@@ -79,6 +92,18 @@ const loadBookForDate = async (date) => {
     const endpoint = isToday(date) ? "/api/book/today" : `/api/book/date?date=${dateStr}`;
     const data = await fetchJson(endpoint);
     currentBook = data.book;
+    
+    // 更新应用启动日期（如果API返回了）
+    if (data.appStartDate) {
+      appStartDate = data.appStartDate;
+      // 重新检查按钮状态
+      const dateOnly = new Date(date);
+      dateOnly.setHours(0, 0, 0, 0);
+      const startDateOnly = new Date(appStartDate);
+      startDateOnly.setHours(0, 0, 0, 0);
+      prevDayBtn.disabled = dateOnly <= startDateOnly;
+    }
+    
     titleCnEl.textContent = `《${currentBook.title_cn}》`;
     titleEnEl.textContent = currentBook.title_en;
     authorEl.textContent = `作者：${currentBook.author || "未知"}`;
@@ -89,7 +114,11 @@ const loadBookForDate = async (date) => {
     buttons.forEach((btn) => btn.classList.remove("active"));
   } catch (err) {
     console.error(err);
-    statusEl.textContent = "无法获取书目，请稍后重试";
+    if (err.message && err.message.includes("无法查看")) {
+      statusEl.textContent = err.message;
+    } else {
+      statusEl.textContent = "无法获取书目，请稍后重试";
+    }
   }
 };
 

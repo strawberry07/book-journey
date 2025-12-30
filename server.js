@@ -735,7 +735,21 @@ const requestListener = async (req, res) => {
   if (req.method === "GET" && urlObj.pathname === "/api/book/today") {
     try {
       const book = await getTodaysBook();
-      return sendJson(res, 200, { book });
+      // 获取应用启动日期（从历史记录中最早的日期，或使用今天的日期）
+      const history = await readHistory();
+      let appStartDate = new Date();
+      if (history.selections && history.selections.length > 0) {
+        const earliestTimestamp = Math.min(...history.selections.map(s => s.timestamp));
+        appStartDate = new Date(earliestTimestamp);
+        appStartDate.setHours(0, 0, 0, 0);
+      }
+      const today = new Date();
+      today.setHours(0, 0, 0, 0);
+      
+      return sendJson(res, 200, { 
+        book,
+        appStartDate: appStartDate.toISOString().split("T")[0] // 返回应用启动日期
+      });
     } catch (err) {
       console.error(err);
       return sendJson(res, 500, { error: "无法获取今日书目" });
