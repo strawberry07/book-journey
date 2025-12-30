@@ -102,12 +102,45 @@ const getBookForDate = async (targetDate) => {
     if (book) return book;
   }
 
-  // If no book for this date, generate one deterministically based on date
-  // This ensures the same date always gets the same book
-  // Use a seed based on the date to make it deterministic
-  const daysSinceEpoch = Math.floor(targetDayStart / DAY_MS);
-  const index = daysSinceEpoch % books.length;
-  return books[index];
+  // 计算从启动日期开始的天数（支持动态书籍数量）
+  const daysSinceStart = Math.floor((targetDayStart - APP_START_DATE.getTime()) / DAY_MS);
+  
+  // 获取最近14天内使用过的书籍ID（考虑冷却期）
+  const recentIds = new Set();
+  history.selections.forEach((entry) => {
+    const entryDate = new Date(entry.timestamp);
+    entryDate.setHours(0, 0, 0, 0);
+    const entryDaysSinceStart = Math.floor((entryDate.getTime() - APP_START_DATE.getTime()) / DAY_MS);
+    const daysDiff = Math.abs(entryDaysSinceStart - daysSinceStart);
+    
+    // 如果这本书在目标日期的14天范围内使用过，加入冷却列表
+    if (daysDiff < 14 && daysDiff >= 0) {
+      recentIds.add(entry.bookId);
+    }
+  });
+
+  // 过滤掉在冷却期内的书籍
+  let candidates = books.filter((book) => !recentIds.has(book.id));
+  
+  // 如果所有书都在冷却期，使用所有书籍（回退机制）
+  // 这种情况理论上不会发生，因为14天冷却期意味着最多只有 books.length - 14 本书在冷却中
+  if (candidates.length === 0) {
+    console.warn(`⚠️  所有 ${books.length} 本书都在冷却期中，使用回退机制`);
+    candidates = books;
+  }
+
+  // 使用确定性算法从候选书籍中选择（基于日期）
+  // 这样确保同一个日期总是选择同一本书
+  const index = daysSinceStart % candidates.length;
+  const selectedBook = candidates[index];
+  
+  // 记录选择（如果还没有记录）
+  if (!existingSelection) {
+    history.selections.push({ bookId: selectedBook.id, timestamp: targetDayStart });
+    await writeHistory(history);
+  }
+  
+  return selectedBook;
 };
 
 const getTodaysBook = async () => {
