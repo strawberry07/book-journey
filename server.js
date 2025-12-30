@@ -63,15 +63,26 @@ const writeState = (data) =>
 const pickNewBookId = async () => {
   const history = await readHistory();
   const now = Date.now();
+  
+  // 获取最近14天内使用过的书籍ID（考虑冷却期）
   const recentIds = new Set(
     history.selections
       .filter((entry) => now - entry.timestamp < COOL_DOWN_MS)
       .map((entry) => entry.bookId)
   );
 
-  const candidates = books.filter((book) => !recentIds.has(book.id));
-  const pool = candidates.length > 0 ? candidates : books;
-  const choice = pool[Math.floor(Math.random() * pool.length)];
+  // 过滤掉在冷却期内的书籍（支持动态书籍数量）
+  let candidates = books.filter((book) => !recentIds.has(book.id));
+  
+  // 如果所有书都在冷却期，使用所有书籍（回退机制）
+  // 这种情况理论上不会发生，因为14天冷却期意味着最多只有 books.length - 14 本书在冷却中
+  if (candidates.length === 0) {
+    console.warn(`⚠️  所有 ${books.length} 本书都在冷却期中，使用回退机制`);
+    candidates = books;
+  }
+  
+  // 从候选书籍中随机选择
+  const choice = candidates[Math.floor(Math.random() * candidates.length)];
 
   history.selections.push({ bookId: choice.id, timestamp: now });
   await writeHistory(history);
