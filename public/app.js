@@ -62,9 +62,17 @@ const loadBookForDate = async (date) => {
   dateDisplayEl.textContent = formatDate(date);
   statusEl.textContent = "正在获取书目...";
   
-  // Disable navigation buttons - start date is today, no previous dates
-  prevDayBtn.disabled = true;
-  nextDayBtn.disabled = isToday(date) || date > new Date();
+  // Enable/disable navigation buttons based on date
+  const today = new Date();
+  today.setHours(0, 0, 0, 0);
+  const dateOnly = new Date(date);
+  dateOnly.setHours(0, 0, 0, 0);
+  
+  // Enable previous day button if not at the earliest date (can go back to yesterday)
+  prevDayBtn.disabled = false; // Allow going back to previous days
+  
+  // Disable next day button if at today or future
+  nextDayBtn.disabled = isToday(date) || dateOnly > today;
   
   try {
     const dateStr = formatDateForAPI(date);
@@ -185,18 +193,25 @@ buttons.forEach((btn) => {
 });
 
 prevDayBtn.addEventListener("click", () => {
-  // Disabled for now - start date is today
-  // const prevDate = new Date(currentDate);
-  // prevDate.setDate(prevDate.getDate() - 1);
-  // loadBookForDate(prevDate);
+  const prevDate = new Date(currentDate);
+  prevDate.setDate(prevDate.getDate() - 1);
+  loadBookForDate(prevDate);
 });
 
 nextDayBtn.addEventListener("click", () => {
   if (isToday(currentDate)) return;
   const nextDate = new Date(currentDate);
   nextDate.setDate(nextDate.getDate() + 1);
-  if (nextDate <= new Date()) {
+  const today = new Date();
+  today.setHours(0, 0, 0, 0);
+  nextDate.setHours(0, 0, 0, 0);
+  
+  if (nextDate <= today) {
     loadBookForDate(nextDate);
+  } else {
+    // 已经到达今天，不能再往前了
+    console.log('已到达今天，无法查看未来日期');
+    // 可以显示一个提示，但不需要alert，因为按钮已经被禁用了
   }
 });
 
