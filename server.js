@@ -1008,23 +1008,18 @@ const requestListener = async (req, res) => {
         req.on("error", reject);
       });
       
-      const { count = 10 } = body;
-      
-      if (count <= 0 || count > 100) {
-        return sendJson(res, 400, { error: "数量必须在 1-100 之间" });
-      }
-      
-      // 异步执行预生成（不阻塞响应）
-      preGenerateSummaries(count).then(results => {
-        console.log("✅ Pre-generation completed:", results);
+      // 异步执行智能预生成（不阻塞响应）
+      // 这会从启动日期开始检查并生成缺失的内容
+      smartPreGenerate().then(() => {
+        console.log("✅ 手动预生成完成");
       }).catch(err => {
-        console.error("❌ Pre-generation error:", err);
+        console.error("❌ 手动预生成错误:", err);
       });
       
       return sendJson(res, 200, { 
         success: true,
-        message: `已开始预生成 ${count} 天的内容，请稍后查看管理界面`,
-        count
+        message: `已开始智能预生成，将从启动日期（${APP_START_DATE_STR}）开始检查并生成缺失的内容`,
+        startDate: APP_START_DATE_STR
       });
     } catch (err) {
       console.error("Error starting pre-generation:", err);
@@ -1186,16 +1181,26 @@ const smartPreGenerate = async () => {
   try {
     const cache = await readCache();
     const today = new Date();
+    today.setHours(0, 0, 0, 0);
     const daysToCheck = 14; // 检查未来14天
     let toGenerate = [];
     
-    console.log('🔍 检查今天和未来14天的内容生成状态...');
+    // 确定起始日期：从启动日期或今天（取较晚的）开始
+    const startDate = new Date(APP_START_DATE > today ? APP_START_DATE : today);
+    startDate.setHours(0, 0, 0, 0);
     
-    // 检查今天和未来14天的内容（包括今天，因为用户可能立即访问）
+    console.log(`🔍 检查从 ${startDate.toISOString().split("T")[0]} 到未来${daysToCheck}天的内容生成状态...`);
+    
+    // 从启动日期（或今天）开始检查，到未来14天
     for (let i = 0; i <= daysToCheck; i++) {
-      const targetDate = new Date(today);
-      targetDate.setDate(today.getDate() + i);
+      const targetDate = new Date(startDate);
+      targetDate.setDate(startDate.getDate() + i);
       const dateStr = targetDate.toISOString().split("T")[0];
+      
+      // 如果目标日期在启动日期之前，跳过
+      if (targetDate < APP_START_DATE) {
+        continue;
+      }
       
       try {
         const book = await getBookForDate(dateStr);
@@ -1212,8 +1217,18 @@ const smartPreGenerate = async () => {
     }
     
     if (toGenerate.length > 0) {
-      console.log(`📚 发现 ${toGenerate.length} 个内容需要预生成（包括今天）`);
+      console.log(`📚 发现 ${toGenerate.length} 个内容需要预生成`);
       console.log(`   需要生成的日期: ${toGenerate.map(item => item.date).join(', ')}`);
+      
+      // 优先排序：启动日期优先，然后是今天，然后是其他日期
+      toGenerate.sort((a, b) => {
+        if (a.date === APP_START_DATE_STR) return -1;
+        if (b.date === APP_START_DATE_STR) return 1;
+        const todayStr = today.toISOString().split("T")[0];
+        if (a.date === todayStr) return -1;
+        if (b.date === todayStr) return 1;
+        return a.date.localeCompare(b.date);
+      });
       // 每次生成3个，避免一次性生成太多（减少到3个以提高成功率）
       const batchSize = 3;
       let successCount = 0;
@@ -1296,7 +1311,8 @@ const smartPreGenerate = async () => {
       console.log(`   ⏭️  跳过: ${skipCount}`);
       console.log(`   ❌ 失败: ${errorCount}`);
     } else {
-      console.log('✅ 未来14天的内容已全部准备就绪');
+      const startDateStr = startDate.toISOString().split("T")[0];
+      console.log(`✅ 从 ${startDateStr} 到未来${daysToCheck}天的内容已全部准备就绪`);
     }
   } catch (err) {
     console.error('❌ 智能预生成失败:', err);
@@ -1305,19 +1321,54 @@ const smartPreGenerate = async () => {
 };
 
 // 服务器启动时延迟执行智能预生成（不阻塞启动）
-// 先快速生成今天的内容，然后生成未来的内容
+// 优先生成启动日期和今天的内容，然后生成未来的内容
 setTimeout(async () => {
   console.log('🚀 启动智能预生成检查...');
   try {
-    // 先检查并生成今天的内容（优先级最高），但只在启动日期之后
     const cache = await readCache();
     const today = new Date();
     today.setHours(0, 0, 0, 0);
     
-    // 如果今天在启动日期之前，不生成今天的内容
-    if (today < APP_START_DATE) {
-      console.log(`📅 今天是 ${today.toISOString().split("T")[0]}，应用将从 ${APP_START_DATE_STR} 开始运行，跳过今天的生成`);
-    } else {
+    // 优先生成启动日期的内容（即使今天在启动日期之前）
+    if (!cache || Object.keys(cache).length === 0 || 
+        !Object.values(cache).some(item => item.status === "approved")) {
+      console.log(`📚 缓存为空或没有已批准内容，优先生成启动日期（${APP_START_DATE_STR}）的内容...`);
+      try {
+        const startBook = await getBookForDate(APP_START_DATE_STR);
+        if (!cache[startBook.id] || cache[startBook.id].status !== "approved") {
+          console.log(`📚 生成启动日期内容: ${startBook.title_cn}`);
+          const summary = await callDeepSeek(startBook);
+          const validation = validateSummary(summary);
+          
+          if (validation.valid) {
+            const summaryWithStatus = {
+              ...summary,
+              status: "approved",
+              validationIssues: [],
+              reviewedAt: Date.now(),
+              reviewedBy: "system",
+              createdAt: Date.now(),
+              source: "deepseek"
+            };
+            
+            const updatedCache = await readCache();
+            updatedCache[startBook.id] = summaryWithStatus;
+            await writeCache(updatedCache);
+            console.log(`✅ 启动日期内容已生成并批准: ${startBook.title_cn}（书籍ID: ${startBook.id}）`);
+            console.log(`   📝 缓存已保存，resonance: ${summary.resonance.length}字, deep_dive: ${summary.deep_dive.length}字, masterclass: ${summary.masterclass.length}字`);
+          } else {
+            console.error(`⚠️  启动日期内容质量检查未通过: ${validation.issues.join(", ")}`);
+          }
+        } else {
+          console.log(`✅ 启动日期内容已存在: ${startBook.title_cn}`);
+        }
+      } catch (err) {
+        console.error(`❌ 生成启动日期内容失败:`, err.message);
+      }
+    }
+    
+    // 如果今天在启动日期之后，也生成今天的内容
+    if (today >= APP_START_DATE) {
       const todayStr = today.toISOString().split("T")[0];
       const todayBook = await getBookForDate(todayStr);
       
@@ -1343,13 +1394,6 @@ setTimeout(async () => {
             await writeCache(updatedCache);
             console.log(`✅ 今天的内容已生成并批准: ${todayBook.title_cn}（书籍ID: ${todayBook.id}）`);
             console.log(`   📝 缓存已保存，resonance: ${summary.resonance.length}字, deep_dive: ${summary.deep_dive.length}字, masterclass: ${summary.masterclass.length}字`);
-            console.log(`   🔍 验证缓存: 重新读取缓存检查书籍 ${todayBook.id}...`);
-            const verifyCache = await readCache();
-            if (verifyCache[todayBook.id] && verifyCache[todayBook.id].status === "approved") {
-              console.log(`   ✅ 缓存验证成功：书籍 ${todayBook.id} 已正确保存`);
-            } else {
-              console.error(`   ❌ 缓存验证失败：书籍 ${todayBook.id} 未正确保存！`);
-            }
           } else {
             console.error(`⚠️  今天的内容质量检查未通过: ${validation.issues.join(", ")}`);
           }
@@ -1359,16 +1403,18 @@ setTimeout(async () => {
       } else {
         console.log(`✅ 今天的内容已存在: ${todayBook.title_cn}`);
       }
+    } else {
+      console.log(`📅 今天是 ${today.toISOString().split("T")[0]}，应用将从 ${APP_START_DATE_STR} 开始运行`);
     }
     
-    // 然后生成未来的内容
+    // 然后生成未来的内容（从启动日期开始）
     await smartPreGenerate();
   } catch (err) {
     console.error('❌ 启动时智能预生成失败:', err);
     console.error('   错误堆栈:', err.stack);
     // 不抛出错误，让服务器继续运行
   }
-}, 5000); // 延迟5秒，快速生成今天的内容
+}, 5000); // 延迟5秒，快速生成启动日期和今天的内容
 
 // 每天凌晨2点执行智能预生成（使用简单的定时器，不依赖外部库）
 // 延迟执行，确保服务器完全启动
