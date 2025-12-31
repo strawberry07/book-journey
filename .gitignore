@@ -13,6 +13,8 @@ data/state.json
 # Logs
 *.log
 npm-debug.log*
+server.log
+server.pid
 
 # OS files
 .DS_Store

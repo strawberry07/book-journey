@@ -48,7 +48,24 @@ const fetchJson = async (url) => {
     if (!res.ok) {
       const errorText = await res.text();
       console.error(`❌ Fetch failed: ${res.status} ${res.statusText}`, errorText);
-      throw new Error(`请求失败: ${res.status} ${res.statusText}`);
+      
+      // 尝试解析错误响应的JSON，获取具体的错误消息
+      let errorMessage = `请求失败: ${res.status}`;
+      try {
+        const errorJson = JSON.parse(errorText);
+        if (errorJson.error) {
+          errorMessage = errorJson.error;
+        }
+      } catch (e) {
+        // 如果不是JSON，使用原始错误文本
+        if (errorText) {
+          errorMessage = errorText;
+        }
+      }
+      
+      const error = new Error(errorMessage);
+      error.status = res.status;
+      throw error;
     }
     return res.json();
   } catch (err) {
@@ -160,9 +177,16 @@ const loadBookForDate = async (date) => {
   } catch (err) {
     console.error("❌ Error loading book:", err);
     
+    // 如果是因为启动日期之前的错误，设置 currentBook 为 null
+    if (err.message && (err.message.includes("应用将从") || err.message.includes("无法查看"))) {
+      currentBook = null;
+    }
+    
     // 友好的错误消息
     let userMessage = "获取书目失败，请稍后再试";
-    if (err.message && err.message.includes("无法查看")) {
+    if (err.message && err.message.includes("应用将从")) {
+      userMessage = err.message;
+    } else if (err.message && err.message.includes("无法查看")) {
       userMessage = err.message;
     } else if (err.message && (err.message.includes("503") || err.message.includes("维护"))) {
       userMessage = "系统维护中，请稍后再试";
@@ -911,7 +935,17 @@ const shareCardImage = async (shareCardStatusEl = null) => {
 };
 
 const shareContent = async () => {
-  if (!currentBook) return;
+  if (!currentBook) {
+    // 显示友好的错误提示
+    statusEl.textContent = "应用将从 2026-01-01 开始运行，请稍后再试";
+    statusEl.style.color = "var(--text-secondary, #666)";
+    
+    // 3秒后恢复默认颜色
+    setTimeout(() => {
+      statusEl.style.color = "";
+    }, 3000);
+    return;
+  }
 
   statusEl.textContent = "正在生成分享卡片...";
   
