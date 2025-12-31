@@ -2,13 +2,12 @@
 
 > 将书单转化为年度深度阅读之旅的移动优先 Web 应用
 
-每日书旅是一个优雅的渐进式 Web 应用（PWA），每天为你精选一本好书，提供三种深度的阅读体验：3 分钟精华、10 分钟思考、30 分钟沉浸。通过智能轮播算法，确保每本书在 14 天内不会重复出现，为你打造一整年的阅读旅程。
+每日书旅是一个优雅的渐进式 Web 应用（PWA），每天为你精选一本好书，提供三种深度的阅读体验：3 分钟精华、10 分钟思考、30 分钟沉浸。通过智能轮播算法，为你打造一整年的阅读旅程。
 
 ## ✨ 功能特性
 
 ### 📖 核心功能
 - **每日精选**：每 24 小时自动选择一本新书
-- **智能轮播**：14 天冷却期，确保阅读体验的多样性
 - **三种深度**：
   - **3 分钟 · 精华**：400 字，快速了解书籍核心价值
   - **10 分钟 · 思考**：1200-1600 字，深入理解核心观点，包含生活应用示例和反思问题
@@ -22,85 +21,7 @@
 - **PWA 支持**：可安装到主屏幕，支持离线访问
 - **分享功能**：生成精美的分享卡片，支持下载和原生分享
 
-### 🤖 AI 驱动
-- **DeepSeek API 集成**：使用 AI 生成高质量的中文摘要
-- **自动质量检查**：系统自动验证内容质量
-- **智能缓存**：减少 API 调用，提升响应速度
 
-## 🛠️ 技术栈
-
-- **后端**：Node.js (ES Modules)
-- **前端**：原生 HTML/CSS/JavaScript
-- **AI 服务**：DeepSeek API
-- **部署**：Railway / 支持多种平台
-- **PWA**：Service Worker + Web App Manifest
-
-## 📦 安装与运行
-
-### 前置要求
-- Node.js >= 18
-- DeepSeek API Key（从 [DeepSeek](https://www.deepseek.com/) 获取）
-
-### 本地开发
-
-1. **克隆仓库**
-```bash
-git clone https://github.com/strawberry07/book-journey.git
-cd book-journey
-```
-
-2. **准备数据文件**
-```bash
-# 创建数据目录
-mkdir -p data
-
-# 准备书籍数据（books.json）
-# 格式：
-# [
-#   {
-#     "id": 1,
-#     "title_cn": "中文书名",
-#     "title_en": "English Title",
-#     "author": "作者名"
-#   },
-#   ...
-# ]
-```
-
-3. **设置环境变量**
-```bash
-export DEEPSEEK_API_KEY="your-deepseek-api-key"
-export PORT=3000  # 可选，默认 3000
-export MAINTENANCE_MODE=false  # 可选，维护模式
-```
-
-4. **启动服务器**
-```bash
-npm start
-```
-
-5. **访问应用**
-打开浏览器访问 `http://localhost:3000`
-
-### 可用脚本
-
-```bash
-npm start          # 启动生产服务器
-npm run dev        # 启动开发服务器
-npm test           # 运行测试
-npm run test-admin # 测试管理功能
-npm run test-pwa   # 测试 PWA 功能
-npm run check      # 检查应用就绪状态
-npm run clear-cache # 清除缓存
-```
-
-## ⚙️ 环境变量
-
-| 变量名 | 必需 | 说明 | 示例 |
-|--------|------|------|------|
-| `DEEPSEEK_API_KEY` | ✅ | DeepSeek API 密钥 | `sk-xxxxx` |
-| `PORT` | ❌ | 服务器端口 | `3000` |
-| `MAINTENANCE_MODE` | ❌ | 维护模式开关 | `true` / `false` |
 
 ## 📁 项目结构
 
@@ -123,113 +44,6 @@ book-journey/
 ├── test.js                # 测试脚本
 └── README.md              # 本文件
 ```
-
-## 🔌 API 端点
-
-### 公开端点
-
-- `GET /api/book/today` - 获取今日书籍
-- `GET /api/book/date?date=YYYY-MM-DD` - 获取指定日期的书籍
-- `GET /api/book/:id/summary` - 获取书籍摘要（三种深度）
-- `GET /health` - 健康检查
-
-### 管理端点
-
-- `GET /api/admin/cache` - 查看缓存状态
-- `POST /api/admin/clear-cache` - 清除缓存
-- `GET /api/admin/check-book?bookId=:id` - 检查特定书籍状态
-- `POST /api/admin/pre-generate` - 手动触发预生成
-
-## 🚀 部署
-
-### Railway 部署（推荐）
-
-1. 在 [Railway](https://railway.app/) 创建新项目
-2. 连接 GitHub 仓库
-3. 设置环境变量：
-   - `DEEPSEEK_API_KEY`
-   - `MAINTENANCE_MODE`（可选）
-4. 配置持久化存储（Volume）：
-   - 挂载路径：`/app/data`
-   - 确保缓存和历史数据持久化
-5. 部署完成！
-
-详细部署指南请参考 [DEPLOYMENT.md](./DEPLOYMENT.md)
-
-### 其他平台
-
-应用支持部署到：
-- Heroku
-- Render
-- Fly.io
-- VPS（使用 PM2 或 systemd）
-
-## 📝 配置说明
-
-### 应用启动日期
-
-应用默认从 **2026-01-01** 开始运行。可以在 `server.js` 中修改 `APP_START_DATE` 常量。
-
-### 书籍轮播规则
-
-- **冷却期**：每本书在 14 天内不会重复出现
-- **智能回退**：如果所有书籍都在冷却期，系统会回退到所有书籍
-- **动态适配**：支持任意数量的书籍，不限制为 100 本
-
-### 预生成策略
-
-- **启动时**：服务器启动 5 秒后自动检查并生成缺失内容
-- **定时任务**：每天凌晨 2:00 自动预生成未来 14 天的内容
-- **优先级**：启动日期和今天的内容优先生成
-
-## 🧪 测试
-
-```bash
-# 运行基础测试
-npm test
-
-# 测试管理功能
-npm run test-admin
-
-# 测试 PWA 功能
-npm run test-pwa
-
-# 检查就绪状态
-npm run check
-```
-
-## 📖 使用指南
-
-### 添加新书籍
-
-编辑 `data/books.json`，添加新书籍条目：
-
-```json
-{
-  "id": 101,
-  "title_cn": "新书名",
-  "title_en": "New Book Title",
-  "author": "作者名"
-}
-```
-
-重启服务器后，新书籍会自动纳入轮播系统。
-
-### 清除缓存
-
-```bash
-# 清除所有缓存
-npm run clear-cache
-
-# 清除特定书籍的缓存
-npm run clear-cache clear 1 2 3
-```
-
-### 维护模式
-
-设置环境变量 `MAINTENANCE_MODE=true` 启用维护模式，应用会返回 503 状态码。
-
-## 🤝 贡献
 
 欢迎提交 Issue 和 Pull Request！
 
