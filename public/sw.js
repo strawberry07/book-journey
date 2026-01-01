@@ -1,6 +1,6 @@
 // Service Worker for 每日书旅 PWA
 // 版本号：用于缓存更新
-const CACHE_VERSION = 'v1.0.1';
+const CACHE_VERSION = 'v1.0.2';
 const CACHE_NAME = `book-journey-${CACHE_VERSION}`;
 
 // 需要缓存的资源

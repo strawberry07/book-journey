@@ -5,8 +5,6 @@ const appStartDateEl = document.getElementById("app-start-date");
 const titleCnEl = document.getElementById("title-cn");
 const titleEnEl = document.getElementById("title-en");
 const authorEl = document.getElementById("author");
-const statusEl = document.getElementById("status");
-const dateDisplayEl = document.getElementById("date-display");
 const prevDayBtn = document.getElementById("prev-day");
 const nextDayBtn = document.getElementById("next-day");
 const shareBtn = document.getElementById("share-btn");
@@ -124,26 +122,70 @@ const loadBookForDate = async (date) => {
       return;
     }
     
+    // 验证 API 返回的数据
+    if (!data.book) {
+      console.error("❌ API 返回的数据中没有书籍信息:", data);
+      throw new Error("API 返回的数据格式不正确：缺少 book 字段");
+    }
+    
     currentBook = data.book;
+    console.log("📚 设置书籍信息:", currentBook);
     
     // 更新应用启动日期（如果API返回了）
     if (data.appStartDate) {
       appStartDate = data.appStartDate;
-      // 重新检查按钮状态
-      const dateOnly = new Date(date);
-      dateOnly.setHours(0, 0, 0, 0);
+      // 重新检查按钮状态（使用外层的 dateOnly，不要重新定义）
       const startDateOnly = new Date(appStartDate);
       startDateOnly.setHours(0, 0, 0, 0);
       prevDayBtn.disabled = dateOnly <= startDateOnly;
     }
     
-    titleCnEl.textContent = `《${currentBook.title_cn}》`;
-    titleEnEl.textContent = currentBook.title_en;
-    authorEl.textContent = `作者：${currentBook.author || "未知"}`;
+    // 设置书籍信息（添加更多检查和日志）
+    console.log("📝 开始设置书籍信息到页面...");
+    console.log("📝 titleCnEl:", titleCnEl);
+    console.log("📝 titleEnEl:", titleEnEl);
+    console.log("📝 authorEl:", authorEl);
+    
+    if (titleCnEl) {
+      titleCnEl.textContent = `《${currentBook.title_cn}》`;
+      console.log("✅ 中文标题已设置:", currentBook.title_cn);
+    } else {
+      console.error("❌ titleCnEl 元素未找到，尝试重新获取...");
+      const retryTitleCnEl = document.getElementById("title-cn");
+      if (retryTitleCnEl) {
+        retryTitleCnEl.textContent = `《${currentBook.title_cn}》`;
+        console.log("✅ 中文标题已设置（重新获取元素）");
+      } else {
+        console.error("❌ 仍然无法找到 title-cn 元素");
+      }
+    }
+    
+    if (titleEnEl) {
+      titleEnEl.textContent = currentBook.title_en;
+      console.log("✅ 英文标题已设置:", currentBook.title_en);
+    } else {
+      console.error("❌ titleEnEl 元素未找到，尝试重新获取...");
+      const retryTitleEnEl = document.getElementById("title-en");
+      if (retryTitleEnEl) {
+        retryTitleEnEl.textContent = currentBook.title_en;
+        console.log("✅ 英文标题已设置（重新获取元素）");
+      }
+    }
+    
+    if (authorEl) {
+      authorEl.textContent = `作者：${currentBook.author || "未知"}`;
+      console.log("✅ 作者信息已设置:", currentBook.author);
+    } else {
+      console.error("❌ authorEl 元素未找到，尝试重新获取...");
+      const retryAuthorEl = document.getElementById("author");
+      if (retryAuthorEl) {
+        retryAuthorEl.textContent = `作者：${currentBook.author || "未知"}`;
+        console.log("✅ 作者信息已设置（重新获取元素）");
+      }
+    }
     
     // 显示应用启动日期信息
     if (data.appStartDate) {
-      appStartDate = data.appStartDate;
       const startDate = new Date(data.appStartDate);
       const startDateStr = formatDate(startDate);
       const today = new Date();
@@ -151,16 +193,22 @@ const loadBookForDate = async (date) => {
       const startDateOnly = new Date(startDate);
       startDateOnly.setHours(0, 0, 0, 0);
       
-      // 如果当前日期就是启动日期，显示提示
+      // 使用外层定义的 dateOnly（第90行）
       if (dateOnly.getTime() === startDateOnly.getTime()) {
-        appStartDateEl.textContent = "（应用启动日）";
-        appStartDateEl.style.display = "inline";
+        if (appStartDateEl) {
+          appStartDateEl.textContent = "（应用启动日）";
+          appStartDateEl.style.display = "inline";
+        }
       } else if (dateOnly < today) {
         // 显示启动日期信息
-        appStartDateEl.textContent = `（启动于 ${startDateStr}）`;
-        appStartDateEl.style.display = "inline";
+        if (appStartDateEl) {
+          appStartDateEl.textContent = `（启动于 ${startDateStr}）`;
+          appStartDateEl.style.display = "inline";
+        }
       } else {
-        appStartDateEl.style.display = "none";
+        if (appStartDateEl) {
+          appStartDateEl.style.display = "none";
+        }
       }
       
       // 更新前一天按钮状态
@@ -223,6 +271,14 @@ const loadToday = () => {
 };
 
 const renderSummary = (depth, content) => {
+  console.log(`🎨 renderSummary called with depth: ${depth}, content length: ${content?.length || 0}`);
+  
+  if (!content) {
+    console.error("❌ renderSummary: content is empty or undefined");
+    summaryEl.innerHTML = "<p>暂无内容</p>";
+    return;
+  }
+  
   // Handle escaped newlines and actual newlines
   let processedContent = content
     // First, handle escaped newlines (\n in string literals)
@@ -249,7 +305,9 @@ const renderSummary = (depth, content) => {
 };
 
 const loadSummary = async (depth) => {
+  console.log("🔘 ========== loadSummary 被调用 ==========");
   console.log("🔘 Depth button clicked:", depth);
+  console.log("🔘 currentBook:", currentBook);
   if (!currentBook) {
     console.error("❌ No current book available");
     statusEl.textContent = "错误：未找到当前书目";
@@ -273,15 +331,43 @@ const loadSummary = async (depth) => {
     console.log(`🌐 Fetching from: ${url}`);
     const data = await fetchJson(url);
     console.log("✅ Received summary data:", Object.keys(data));
+    console.log("📦 Full response data:", data);
+    
     const summary = data.summary;
     if (!summary) {
       console.error("❌ No summary in response:", data);
       statusEl.textContent = "错误：响应中缺少摘要数据";
       return;
     }
+    
+    console.log(`📋 Summary object keys:`, Object.keys(summary));
+    console.log(`📋 Requested depth: ${depth}`);
+    console.log(`📋 Summary for ${depth}:`, summary[depth] ? `存在 (${summary[depth].length} 字符)` : "不存在");
+    
+    if (!summary[depth]) {
+      console.error(`❌ Summary for depth "${depth}" not found. Available depths:`, Object.keys(summary));
+      statusEl.textContent = `错误：未找到 ${depth} 版本的摘要`;
+      return;
+    }
+    
     console.log(`📄 Rendering ${depth} summary (length: ${summary[depth]?.length || 0} chars)`);
-    renderSummary(depth, summary[depth] || "暂无内容");
-    statusEl.textContent = ""; // Clear status text
+    
+    // 检查 summaryEl 是否存在
+    if (!summaryEl) {
+      console.error("❌ summaryEl 元素未找到");
+      statusEl.textContent = "错误：页面元素未找到";
+      return;
+    }
+    
+    try {
+      renderSummary(depth, summary[depth]);
+      console.log("✅ Summary rendered successfully");
+      statusEl.textContent = ""; // Clear status text
+    } catch (renderErr) {
+      console.error("❌ Error in renderSummary:", renderErr);
+      statusEl.textContent = "错误：渲染摘要时出错";
+      summaryEl.innerHTML = `<p style="color: red;">渲染错误：${renderErr.message}</p>`;
+    }
   } catch (err) {
     console.error("❌ Error loading summary:", err);
     console.error("   Error details:", {
@@ -352,12 +438,31 @@ const loadSummary = async (depth) => {
   }
 };
 
-buttons.forEach((btn) => {
-  btn.addEventListener("click", () => {
+// 检查按钮是否正确获取
+console.log("🔘 初始化深度按钮事件监听器...");
+console.log("🔘 buttons 数量:", buttons.length);
+console.log("🔘 buttons 内容:", Array.from(buttons).map(btn => ({
+  depth: btn.dataset.depth,
+  text: btn.textContent.trim(),
+  element: btn
+})));
+
+if (buttons.length === 0) {
+  console.error("❌ 未找到深度按钮！请检查 HTML 中的 .depth-btn 类名");
+} else {
+  buttons.forEach((btn) => {
     const depth = btn.dataset.depth;
-    loadSummary(depth);
+    console.log(`🔘 为按钮绑定事件: ${depth}`);
+    
+    btn.addEventListener("click", (e) => {
+      e.preventDefault();
+      e.stopPropagation();
+      console.log(`🔘 按钮被点击: ${depth}`);
+      loadSummary(depth);
+    });
   });
-});
+  console.log("✅ 所有深度按钮事件监听器已绑定");
+}
 
 prevDayBtn.addEventListener("click", () => {
   const prevDate = new Date(currentDate);
