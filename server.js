@@ -538,7 +538,9 @@ const ensureSummary = async (bookId) => {
       delete cache[bookId];
       await writeCache(cache);
     } else {
-      console.log(`✅ [ensureSummary] 从缓存返回书籍 ${bookId} 的内容（已批准）`);
+      const cacheAge = cached.createdAt ? Math.floor((Date.now() - cached.createdAt) / 1000) : 0;
+      console.log(`✅ [ensureSummary] ⚡ 从缓存返回书籍 ${bookId} 的内容（已批准，缓存年龄: ${cacheAge}秒）`);
+      console.log(`   📦 缓存大小: resonance=${cached.resonance.length}字, deep_dive=${cached.deep_dive.length}字, masterclass=${cached.masterclass.length}字`);
       return {
         resonance: cached.resonance,
         deep_dive: cached.deep_dive,
@@ -550,7 +552,7 @@ const ensureSummary = async (bookId) => {
   } else if (cached) {
     console.log(`⚠️  [ensureSummary] 书籍 ${bookId} 在缓存中但状态为 "${cached.status}"，需要重新生成`);
   } else {
-    console.log(`❌ [ensureSummary] 书籍 ${bookId} 不在缓存中，需要生成`);
+    console.log(`❌ [ensureSummary] 书籍 ${bookId} 不在缓存中，需要生成（将调用 DeepSeek API）`);
   }
   
   // 如果存在但状态不是 approved，删除并重新生成
@@ -563,13 +565,17 @@ const ensureSummary = async (bookId) => {
   // 生成新摘要
   const book = books.find((b) => b.id === bookId);
   if (!book) throw new Error("Book not found");
-  
+
+  console.log(`🔄 [ensureSummary] 开始生成书籍 ${bookId}《${book.title_cn}》的摘要（调用 DeepSeek API）...`);
+  const apiStartTime = Date.now();
+
   // 重试机制：最多重试3次
   let retryCount = 0;
   const maxRetries = 3;
   
   while (retryCount < maxRetries) {
     try {
+      console.log(`📤 [ensureSummary] 调用 DeepSeek API (尝试 ${retryCount + 1}/${maxRetries})...`);
       const summary = await callDeepSeek(book);
       
       // 自动质量检查
@@ -604,7 +610,9 @@ const ensureSummary = async (bookId) => {
       cache[bookId] = summaryWithStatus;
       await writeCache(cache);
       
-      console.log(`✅ Book ${bookId} summary auto-approved by system (attempt ${retryCount + 1})`);
+      const apiDuration = Date.now() - apiStartTime;
+      console.log(`✅ [ensureSummary] Book ${bookId} summary auto-approved by system (attempt ${retryCount + 1}, API耗时: ${apiDuration}ms)`);
+      console.log(`   📝 已保存到缓存，resonance=${summary.resonance.length}字, deep_dive=${summary.deep_dive.length}字, masterclass=${summary.masterclass.length}字`);
       
       // 直接返回内容
       return {
@@ -1221,11 +1229,11 @@ const requestListener = async (req, res) => {
       return sendJson(res, 400, { error: "无效的书籍 ID" });
     }
     try {
-      console.log(`   ✅ Processing summary request for book ID: ${id}`);
+      console.log(`📥 [API] 收到摘要请求: /api/book/${id}/summary`);
       const startTime = Date.now();
       const summary = await ensureSummary(id);
       const duration = Date.now() - startTime;
-      console.log(`   ✅ Summary generated/retrieved successfully in ${duration}ms`);
+      console.log(`   ✅ [API] 摘要返回成功，总耗时: ${duration}ms`);
       return sendJson(res, 200, { summary });
     } catch (err) {
       console.error(`   ❌ Error in ensureSummary:`, err);

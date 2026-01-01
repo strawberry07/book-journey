@@ -184,37 +184,19 @@ const loadBookForDate = async (date) => {
       }
     }
     
-    // 显示应用启动日期信息
+    // 更新应用启动日期信息（不显示在界面上）
     if (data.appStartDate) {
       const startDate = new Date(data.appStartDate);
-      const startDateStr = formatDate(startDate);
-      const today = new Date();
-      today.setHours(0, 0, 0, 0);
       const startDateOnly = new Date(startDate);
       startDateOnly.setHours(0, 0, 0, 0);
       
-      // 使用外层定义的 dateOnly（第90行）
-      if (dateOnly.getTime() === startDateOnly.getTime()) {
-        if (appStartDateEl) {
-          appStartDateEl.textContent = "（应用启动日）";
-          appStartDateEl.style.display = "inline";
-        }
-      } else if (dateOnly < today) {
-        // 显示启动日期信息
-        if (appStartDateEl) {
-          appStartDateEl.textContent = `（启动于 ${startDateStr}）`;
-          appStartDateEl.style.display = "inline";
-        }
-      } else {
-        if (appStartDateEl) {
-          appStartDateEl.style.display = "none";
-        }
+      // 隐藏启动日期提示
+      if (appStartDateEl) {
+        appStartDateEl.style.display = "none";
       }
       
       // 更新前一天按钮状态
       prevDayBtn.disabled = dateOnly <= startDateOnly;
-      
-      console.log(`📅 应用启动日期: ${startDateStr}`);
     }
     
     statusEl.textContent = "选择上方深度开始阅读";
